@@ -118,6 +118,8 @@ curl -o install.sh https://shovel.cyberspike.top/install.sh && bash install.sh
 
 ## 🎉 鸣谢
 
+Shovel项目（包含官方插件）开发过程中调用或二次开发了以下项目，在此感谢项目及其作者们！
+
 - https://github.com/owasp-amass/amass
 - https://github.com/wgpsec/ENScan_GO
 - https://github.com/projectdiscovery/nuclei
@@ -125,7 +127,7 @@ curl -o install.sh https://shovel.cyberspike.top/install.sh && bash install.sh
 
 ---
 📌 法律声明：本工具仅限合法授权测试使用，开发者不对滥用行为负责<br> 
-📧 商务合作：shovel@hscsec.cn | 🌐 官网：https://www.hscsec.cn
+📧 商务合作：shovel@hscsec.cn | 🌐 团队官网：https://www.hscsec.cn
 
 
 让我们一起打造更强大的Shovel插件生态！🚀
