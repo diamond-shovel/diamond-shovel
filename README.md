@@ -13,7 +13,7 @@
     <a href="#-重新定义企业资产管理范式">🔍 概述</a> •
     <a href="#-快速部署使用">⚡ 快速部署</a> •
     <a href="#-插件生态系统">🧩 插件生态</a> •
-    <a href="#-欢迎贡献插件">🤝 参与贡献</a>
+    <a href="#-核心文档">💡 核心文档</a>
   </p>
 
 
@@ -57,7 +57,7 @@
 
 <img src="./img/shovel-project-structure-diagram.svg"/>
 
-* 此项目仅为`shovel_core`的开源代码，`shovel-intermediate-layer`、`shovel-frontend`目前由仓库管理者团队进行运维，如果您对项目由任何建议或发现了任何bug，欢迎提交[Issue](https://github.com/diamond-shovel/diamond-shovel/issues)，感谢您的建设！
+* 此项目仅为`shovel_core`的开源代码，`shovel-intermediate-layer`、`shovel-frontend`目前由仓库管理者团队进行运维，如果您对项目有任何建议、议题，欢迎提交[Issue](https://github.com/diamond-shovel/diamond-shovel/issues)，感谢您的建设！
 
 ### ⚡ 快速部署使用
 
@@ -85,24 +85,15 @@ curl -o install.sh https://shovel.cyberspike.top/install.sh && bash install.sh
 | **domain_seeker**       | 根据任务中的域名信息，进行子域名信息收集                                 | `info-collecting`, `collector`, `website`, `discovery`, `domain`, `DNS`, `amass` |
 | **nuclei_reactor**      | 根据任务中的URL信息，使用Nuclei扫描器进行漏洞检测                        | `vulnerability`, `detection`, `nuclei`, `exploit`, `CVE`             |
 
-* 更多社区插件: [插件仓库](https://github.com/diamond-shovel/diamond-shovel-plugin)
+* 更多社区插件: 插件商店建设中...
+
 
 ---
 
-### 🛠️ 插件开发指南（即将发布）
-
-我们正在编写详细的插件开发文档，包括：
-- **插件开发框架详解**：从零开始构建一个插件
-- **核心API参考手册**：了解Shovel提供的核心接口
-- **插件调试与测试**：如何高效调试和验证插件功能
-- **插件发布流程**：将你的插件贡献到官方或社区插件库
-
----
-
-### 🌱 欢迎贡献插件
+### 🌱 欢迎贡献插件（插件商店建设中）
 
 我们鼓励开发者参与插件生态建设：
-1. **提交插件**：将你的插件代码提交到我们的[插件仓库](https://github.com/diamond-shovel/diamond-shovel-plugin)
+1. **提交插件**：将你的插件代码提交到我们的插件市场
 2. **插件审核**：经过审核后，优质插件将被纳入官方插件库
 3. **社区奖励**：贡献者将获得专属荣誉标识和社区积分
 
@@ -112,6 +103,15 @@ curl -o install.sh https://shovel.cyberspike.top/install.sh && bash install.sh
 
 - **插件编写指南**：详细的插件开发Wiki将在近期发布，敬请期待！
 - **插件反馈**：如果你对现有插件有任何建议或发现问题，欢迎提交[Issue](https://github.com/diamond-shovel/diamond-shovel/issues)
+
+### 💡 核心文档
+
+以下是 Shovel Core 的核心文档，主要面向插件开发者和需要深入了解 Shovel 内部机制的用户。
+**请注意，如果您是普通用户，建议使用[快速部署](./quick-start.md)，无需阅读以下文档。**
+
+*   [简易插件开发指南](docs/plugin-dev.md)
+*   [命令行版本安装指南](docs/install.md)
+*   [命令行调用手册](docs/cmdline.md)
 
 
 ---
