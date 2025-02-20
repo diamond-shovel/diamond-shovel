@@ -1,133 +1,59 @@
-<div align="center">
-  <a href="https://www.hscsec.cn">
-    <img src="./img/favicon.ico" alt="shovel" height="80" />
-  </a>
-  <h1>
-    <b>SHOVEL</b>
-  </h1>
-  
+# Diamond Shovel
 
-<a href="https://www.hscsec.cn"><img src="https://readme-typing-svg.demolab.com?font=ZCOOL+KuaiLe&pause=1000&color=F7F7F7&center=true&vCenter=true&width=435&lines=%E8%A7%A3%E6%94%BE%E5%8F%8C%E6%89%8B%EF%BC%8C%E4%B8%8D%E5%81%9A%E5%90%97%E5%96%BD" alt="Typing SVG" /></a>
+> 面向目标的自动化漏洞发现和渗透测试框架
 
-<p align="center">
-    <a href="#-重新定义企业资产管理范式">🔍 概述</a> •
-    <a href="#-快速部署使用">⚡ 快速部署</a> •
-    <a href="#-插件生态系统">🧩 插件生态</a> •
-    <a href="#-欢迎贡献插件">🤝 参与贡献</a>
-  </p>
+![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg?style=for-the-badge&logo=python)
 
+## 简介
 
+项目名来源: Minecraft同款名[Diamond Shovel](https://en.wikipedia.org/wiki/Diamond_shovel)
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
-[![Ant Design](https://img.shields.io/badge/Ant_Design-0170FE?style=for-the-badge&logo=ant-design&logoColor=white)](https://ant.design/)
-[![L7Map](https://img.shields.io/badge/L7Map-1A73E8?style=for-the-badge&logo=mapbox&logoColor=white)](https://l7.antv.antgroup.com/)
-[![Nmap](https://img.shields.io/badge/Nmap-FF6600?style=for-the-badge&logo=gnu&logoColor=white)](https://nmap.org/)
-[![httpx](https://img.shields.io/badge/httpx-00B894?style=for-the-badge&logo=curl&logoColor=white)](https://github.com/projectdiscovery/httpx)
-[![nuclei](https://img.shields.io/badge/nuclei-4B32C3?style=for-the-badge&logo=nuclio&logoColor=white)](https://nuclei.projectdiscovery.io/)
-  <p>
-    <sub>
-      Powered with ❤️ by
-      <a href="https://www.hscsec.cn">
-        <b>HSC Security</b>
-      </a>
-    </sub>
-  </p>
-</div>
+<details>
+<summary>项目名原因</summary>
 
-<img src="./img/shovel.jpg?raw=true" alt="shovel" style="width: 100%;">
+~~你能指望一大群理工人怎么起名=-=~~
 
-</div>
+嗯, 至少在中文语境下, 铲子是用来挖洞的, 安全漏洞简称洞, 就先叫`Shovel`了
 
-<div style="background-color:#ffffe0; padding:10px; border:1px solid #ddd;">
-  <p style="color:#ff8c00;"><b>⚠️ 免责声明</b></p>
-  <p>此项目正在积极开发中。预计新版本会引入突破性变更。更新前请务必查看版本更改日志。</p>
-</div>
+至于`Diamond`的话, 我也不知道=-=
 
+</details>
 
-### 🔍 重新定义企业资产管理范式
+这个框架本身并不会做太多的事情, 而是起到了类似于免疫系统中<cite>[树突状细胞][1]</cite>的作用, 
+将目标信息呈递给各个插件, 并允许插件在*Diamond Shovel*的*平台*上进行信息交换,
+省去了安全研究人员在日常工作中大量的虐待`Ctrl` `C`和`V`键的工作, 
+让他们更加专注于思考和脱发, 并通过在*Diamond Shovel*编写或使用插件来提高他们的效率.
 
-**Shovel** 是一款面向现代企业安全团队的开源资产测绘平台。通过融合主被动扫描引擎、多模态数据关联分析和智能风险评估模型，我们致力于解放安全行业重复劳动者的双手、为企业提供更优雅的资产治理解决方案。
+## 使用方法
 
-### 📕 项目结构
+请注意, 正如上述简介所述, *Diamond Shovel*本身并不会做太多的事情, 您需要通过编写插件或者安装额外的插件来达到您的需要.
 
-* 项目由`shovel_core`、`shovel-intermediate-layer`、`shovel-frontend`三个子层构成，具体组成如图所示:
+您可以在[这里](https://github.com/diamond-shovel/diamond-shovel-plugins)找到我们预先免费提供的插件, 但请注意社区版钻石铲并不能正确识别`.ore`结尾的插件包.
 
-<img src="./img/shovel-project-structure-diagram.svg"/>
+### 安装
 
-* 此项目仅为`shovel_core`的开源代码，`shovel-intermediate-layer`、`shovel-frontend`目前由仓库管理者团队进行运维，如果您对项目由任何建议或发现了任何bug，欢迎提交[Issue](https://github.com/diamond-shovel/diamond-shovel/issues)，感谢您的建设！
+参见[安装方法](docs/install.md)
 
-### ⚡ 快速部署使用
+### 钻石铲命令行调用办法
 
-#### 一键部署
-``` 
-curl -o install.sh https://shovel.cyberspike.top/install.sh && bash install.sh
-# 验证码需要关注"中龙技术"公众号回复"SHOVEL-ACTIVATE"获取
-```
+参见[命令行调用](docs/cmdline.md)
 
-[![快速开始](https://img.shields.io/badge/-快速开始-orange?style=for-the-badge&logo=rocket&logoColor=white&padding=8)](./quick-start.md)
+### 钻石铲插件开发
 
+参见[插件开发](docs/plugin-dev.md)
 
-### 🧩 插件生态系统
+## 贡献
 
-#### 官方基础插件集（持续更新）
+如果您遇到了Bug, 或者是想为钻石铲做一些什么, 请参考[贡献指南](CONTRIBUTING.md)
 
+## 不同版本
 
-| 插件名称                | 功能描述                                                                 | 标签                                                                 |
-|-------------------------|--------------------------------------------------------------------------|----------------------------------------------------------------------|
-| **fingerprinter**       | 根据任务中的URL信息进行CMS指纹识别                                       | `info-collecting`, `collector`, `discovery`, `identification`, `CMS` |
-| **nmapper**             | 根据任务中的Host信息，使用Nmap扫描器进行端口探测并识别服务               | `info-collecting`, `collector`, `network`, `nmap`, `port`, `discovery`, `CIDR` |
-| **fofa_mapper**         | 根据任务中的域名信息，使用FOFA进行信息收集                               | `info-collecting`, `collector`, `domain`, `FOFA`                     |
-| **http_port_visitor**   | 根据任务中的开放端口信息，进行相关Web服务的信息收集                      | `httpx`, `info-collecting`, `collector`, `ports`, `http`             |
-| **company_investigator**| 根据任务中的公司/集团名进行ICP备案信息收集                               | `info-collecting`, `collector`, `company`, `enscan`, `unstable`      |
-| **domain_seeker**       | 根据任务中的域名信息，进行子域名信息收集                                 | `info-collecting`, `collector`, `website`, `discovery`, `domain`, `DNS`, `amass` |
-| **nuclei_reactor**      | 根据任务中的URL信息，使用Nuclei扫描器进行漏洞检测                        | `vulnerability`, `detection`, `nuclei`, `exploit`, `CVE`             |
+是的, 除去这个开源的版本外, 钻石铲有一个商业版的闭源分支, 而商业版的模式将与开源版的结构大不相同, 使用方式也有很大幅度的变动
 
-* 更多社区插件: [插件仓库](https://github.com/diamond-shovel/diamond-shovel-plugin)
+与商业版的比较以及商业版相关文档将置于[github.io文档](https://diamond-shovel.github.io/shovel-wiki)上
 
----
+## 开源许可
 
-### 🛠️ 插件开发指南（即将发布）
+钻石铲社区版是一个开源项目, 由[LGPL-3.0](LICENSE)许可证保护.
 
-我们正在编写详细的插件开发文档，包括：
-- **插件开发框架详解**：从零开始构建一个插件
-- **核心API参考手册**：了解Shovel提供的核心接口
-- **插件调试与测试**：如何高效调试和验证插件功能
-- **插件发布流程**：将你的插件贡献到官方或社区插件库
-
----
-
-### 🌱 欢迎贡献插件
-
-我们鼓励开发者参与插件生态建设：
-1. **提交插件**：将你的插件代码提交到我们的[插件仓库](https://github.com/diamond-shovel/diamond-shovel-plugin)
-2. **插件审核**：经过审核后，优质插件将被纳入官方插件库
-3. **社区奖励**：贡献者将获得专属荣誉标识和社区积分
-
----
-
-### 📢 温馨提示
-
-- **插件编写指南**：详细的插件开发Wiki将在近期发布，敬请期待！
-- **插件反馈**：如果你对现有插件有任何建议或发现问题，欢迎提交[Issue](https://github.com/diamond-shovel/diamond-shovel/issues)
-
-
----
-
-## 🎉 鸣谢
-
-Shovel项目（包含官方插件）开发过程中调用或二次开发了以下项目，在此感谢项目及其作者们！
-
-- https://github.com/owasp-amass/amass
-- https://github.com/wgpsec/ENScan_GO
-- https://github.com/projectdiscovery/nuclei
-- https://github.com/antvis/L7
-
----
-📌 法律声明：本工具仅限合法授权测试使用，开发者不对滥用行为负责<br> 
-📧 商务合作：shovel@hscsec.cn | 🌐 团队官网：https://www.hscsec.cn
-
-
-让我们一起打造更强大的Shovel插件生态！🚀
+[1]: https://en.wikipedia.org/wiki/Dendritic_cell 或 [树突状细胞](https://baike.baidu.com/item/%E6%A0%91%E7%AA%81%E7%8A%B6%E7%BB%86%E8%83%9E/1375145)
