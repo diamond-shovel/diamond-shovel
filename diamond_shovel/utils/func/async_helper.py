@@ -84,3 +84,12 @@ def disallows_direct_async(func):
             raise RuntimeError(f"Function {func.__name__} cannot be called directly from an async context. Please use `async_helper.call_async` instead.")
         return func(*args, **kwargs)
     return wrapper
+
+def threaded_async_run(coro):
+    loop = asyncio.new_event_loop()
+    def new_threaded_event_loop():
+        asyncio.set_event_loop(loop)
+        asyncio.run(coro)
+
+    pool.submit(new_threaded_event_loop)
+    return loop

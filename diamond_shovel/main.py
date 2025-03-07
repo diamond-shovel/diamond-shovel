@@ -13,6 +13,7 @@ import loguru
 from kink import di, inject
 
 import diamond_shovel.config
+import diamond_shovel.slave.server
 import diamond_shovel.utils.func
 from diamond_shovel.cli import historian
 from diamond_shovel.function.binary_manager import BinaryManager
@@ -74,8 +75,10 @@ def main():
     if whitelist and blacklist:
         whitelist = None
 
-    if not args.target and not args.domain and not args.ip and not args.json and not args.extras:
+    if not args.target and not args.domain and not args.ip and not args.json and not args.extras and not args.daemon:
         parser.print_help()
+    elif args.daemon:
+        diamond_shovel.slave.server.start_api_slave(args.daemon_url)
     else:
         run_once(args, blacklist, whitelist)
 
@@ -95,13 +98,16 @@ def init_parser_arguments(parser):
     parser.add_argument("-r", "--root", help="根文件夹", default=pathlib.Path("/"), type=pathlib.Path)
     parser.add_argument("-P", "--plugin", help="安装插件", type=pathlib.Path, default=None)
     parser.add_argument("-t", "--target", help="目标公司", nargs="*", default=[], type=str)
-    parser.add_argument("-m", "--domain", help="目标域名", nargs="*", default=[], type=str)
+    parser.add_argument("-d", "--domain", help="目标域名", nargs="*", default=[], type=str)
     parser.add_argument("-i", "--ip", help="目标ip", nargs="*", default=[], type=str)
     parser.add_argument("-j", "--json", help="从json文件中读取目标", type=pathlib.Path)
     parser.add_argument("-J", "--out-json", help="设置json结果输出目录", type=pathlib.Path,
                         default=pathlib.Path("./diamond-shovel-result.json"))
     parser.add_argument("--enable-plugin", type=str, default=None, help="启用插件", nargs="*")
     parser.add_argument("--disable-plugin", type=str, default=None, help="禁用插件", nargs="*")
+
+    parser.add_argument("-D", "--daemon", help="以Daemon模式运行", type=bool, default=False)
+    parser.add_argument("-U", "--daemon-url", help="Daemon将会监听的URL", type=str, default="unix:///var/run/diamond_shovel.sock")
 
 
 def run_once(args, blacklist, whitelist):

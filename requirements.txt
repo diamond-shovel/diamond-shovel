@@ -28,3 +28,5 @@ kink~=0.8.1
 dill~=0.3.9
 loguru~=0.7.2
 pip~=24.3.1
+fastapi~=0.115.11
+uvicorn~=0.34.0
