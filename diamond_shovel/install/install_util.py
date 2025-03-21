@@ -1,7 +1,9 @@
 import logging
 import os
+import pwd
 import pathlib
 import shutil
+import subprocess
 
 from . import config_generation
 
@@ -31,6 +33,9 @@ def perform_installation(root: pathlib.Path):
     logging.info("创建日志文件夹...")
     install_log_folder(root)
 
+    logging.info("创建用户...")
+    create_user()
+
     logging.info("安装完成")
 
 
@@ -54,6 +59,16 @@ def install_data_folder(root):
     data_folder.chmod(0o755)
     shutil.chown(data_folder, "diamond-shovel", "diamond-shovel")
 
+def create_user():
+    user = pwd.getpwnam("diamond-shovel")
+    if user is not None:
+        return user.pw_uid
+
+    try:
+        subprocess.run(["useradd", "-r", "-s", "/sbin/nologin", "diamond-shovel"], check=True)
+    except subprocess.CalledProcessError as e:
+        logging.error(f"创建用户失败: {e}")
+        raise
 
 def install_config(root):
     config_folder = root / "etc" / "diamond-shovel"
