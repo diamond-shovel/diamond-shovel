@@ -4,7 +4,7 @@ import logging
 import random
 import threading
 from asyncio import Future, current_task
-from typing import Callable, Any, Coroutine
+from typing import Callable, Any, Coroutine, Optional
 
 import loguru
 
@@ -13,13 +13,96 @@ import diamond_shovel.plugins.manage
 from . import scheduler
 from .scheduler import CoroutineQueue, ShovelCoroutine
 from ..plugins import events, PluginInitContext, manage
-from ..utils.func import async_helper
+from ..utils.func import async_helper, json_util
 from ..utils.func.async_helper import call_async
 
 
 class WorkerException(Exception):
     pass
 
+class Vulnerability(json_util.JsonExportable):
+    def __init__(self, name: str, description: str, severity: str, references: list[str]):
+        self.name = name
+        self.description = description
+        self.severity = severity
+        self.references = references
+
+    def export(self) -> dict:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "severity": self.severity,
+            "references": self.references
+        }
+
+class Asset(json_util.JsonExportable):
+    def __init__(self, owner: 'Company', host: str, port: int, layer4_protocol: int):
+        self.owner = owner
+        self.owner.add_asset(self)
+
+        self.host = host
+        self.port = port
+        self.layer4_protocol = layer4_protocol
+
+        self.identified_service = ""
+        self.signature = ""
+
+        self.discovered_techniques = []
+        self.vulnerabilities = []
+
+    def put_identified_service(self, service: str):
+        self.identified_service = service
+
+    def put_signature(self, signature: str):
+        self.signature = signature
+
+    def add_discovered_technique(self, technique: str):
+        if technique not in self.discovered_techniques:
+            self.discovered_techniques.append(technique)
+
+    def add_vulnerability(self, vulnerability: Vulnerability):
+        if vulnerability not in self.vulnerabilities:
+            self.vulnerabilities.append(vulnerability)
+
+    def export(self):
+        return {
+            "owner": self.owner.company_name,
+            "host": self.host,
+            "port": self.port,
+            "layer4_protocol": self.layer4_protocol,
+            "identified_service": self.identified_service,
+            "signature": self.signature,
+            "discovered_techniques": self.discovered_techniques,
+            "vulnerabilities": [vuln.export() for vuln in self.vulnerabilities]
+        }
+
+class Company(json_util.JsonExportable):
+    def __init__(self, company_name: str):
+        self.company_name = company_name
+        self.assets = []
+        self._assigned_task: Optional['TaskContext'] = None
+
+    def get_relation_to(self, target: Any) -> float:
+        if self._assigned_task is None:
+            raise ValueError("Company has not assigned to a task. Use `TaskContext#put_company` first.")
+        return self._assigned_task.get_relation_weight(self, target)
+
+    def add_asset(self, asset: Asset):
+        if asset not in self.assets:
+            self.assets.append(asset)
+
+        self._assigned_task.put_relation(self, asset, 1)
+
+    def add_relationship(self, target: Any, weight: float):
+        if self._assigned_task is None:
+            raise ValueError("Company has not assigned to a task. Use `TaskContext#put_company` first.")
+        self._assigned_task.put_relation(self, target, weight)
+
+    def export(self):
+        return {
+            "company_name": self.company_name,
+            "assets": [asset.export() for asset in self.assets]
+        }
 
 class UnsatisfiedDependencyException(Exception):
     def __init__(self, plugin_name, worker_name):
@@ -43,32 +126,34 @@ def concat_worker_name(plugin_name, worker_name):
 
 class TaskContext:
     def __init__(self):
-        self.__futures__: dict[str, Future[Any]] = {}
-        self.__finished_plugins__: dict[str, Future[Any]] = {}
-        self.__worker_tasks__: CoroutineQueue | None = None
-        self.__plugin_config__ = {}
-        self.__log__ = []
+        self._futures: dict[str, Future[Any]] = {}
+        self._finished_plugins: dict[str, Future[Any]] = {}
+        self._worker_tasks: CoroutineQueue | None = None
+        self._plugin_config = {}
+        self._log = []
+        self._discovered_companies = []
+        self._company_relationship: dict[Any, list[dict[Company, float]]] = {}
 
     def start(self, workers):
-        if self.__worker_tasks__ is not None:
+        if self._worker_tasks is not None:
             raise Exception("Task already started.")
-        self.__worker_tasks__ = workers
+        self._worker_tasks = workers
 
     def __list__(self):
-        return self.__futures__.keys()
+        return self._futures.keys()
 
     async def get(self, name: str):
-        if name not in self.__futures__ or (self.__futures__[name].done() and await self.__futures__[name] is None):
+        if name not in self._futures or (self._futures[name].done() and await self._futures[name] is None):
             logging.debug(f"Reset {name} for {current_task(asyncio.get_running_loop())}")
             loop = asyncio.get_running_loop()
-            self.__futures__[name] = loop.create_future()
+            self._futures[name] = loop.create_future()
 
         # Avoid accidentally uncontrolled modification. Their modification must fire an event.
         if scheduler.current_coroutine().waiting:
-            value = copy.deepcopy(await self.__futures__[name])
+            value = copy.deepcopy(await self._futures[name])
         else:
             async with scheduler.current_coroutine().park(f"ctx[{name}]"):
-                value = copy.deepcopy(await self.__futures__[name])
+                value = copy.deepcopy(await self._futures[name])
         evt = events.TaskReadTriggerEvent(self, name, value)
         await async_helper.call_sync(events.call_event, evt)
 
@@ -78,17 +163,17 @@ class TaskContext:
         loop = asyncio.get_running_loop()
 
         old_value = None
-        if name in self.__futures__ and self.__futures__[name].done():
-            old_value = self.__futures__[name].result()
+        if name in self._futures and self._futures[name].done():
+            old_value = self._futures[name].result()
 
         evt = events.TaskWriteTriggerEvent(self, name, result, old_value)
         await async_helper.call_sync(events.call_event, evt)
-        if name not in self.__futures__ or self.__futures__[name].done():
-            self.__futures__[name] = loop.create_future()
+        if name not in self._futures or self._futures[name].done():
+            self._futures[name] = loop.create_future()
         if evt.value is None:
             raise ValueError(f"Cannot set {name} to None")
 
-        self.__futures__[name].set_result(evt.value)
+        self._futures[name].set_result(evt.value)
 
     @async_helper.disallows_direct_async
     def __getitem__(self, item):
@@ -99,15 +184,15 @@ class TaskContext:
         call_async(self.set, key, value)
 
     def items(self):
-        return [(key, values) for key, values in self.__futures__.items() if values.done()]
+        return [(key, values) for key, values in self._futures.items() if values.done()]
 
     def __iter__(self):
         for key, values in self.items():
             yield key, values
 
     def __contains__(self, item):
-        return (item in self.__futures__ and self.__futures__[item].done() and
-                self.__futures__[item].result() is not None)
+        return (item in self._futures and self._futures[item].done() and
+                self._futures[item].result() is not None)
 
     async def operate(self, key, func, *args, **kwargs):
         tmp = await self.get(key)
@@ -118,23 +203,23 @@ class TaskContext:
         if plugin_name not in diamond_shovel.plugins.manage.plugin_table:
             return None
 
-        if concat_worker_name(plugin_name, worker_name) not in self.__finished_plugins__:
+        if concat_worker_name(plugin_name, worker_name) not in self._finished_plugins:
             loop = asyncio.get_running_loop()
-            self.__finished_plugins__[concat_worker_name(plugin_name, worker_name)] = loop.create_future()
+            self._finished_plugins[concat_worker_name(plugin_name, worker_name)] = loop.create_future()
 
         async with scheduler.current_coroutine().park(f"ctx.get_worker_result({plugin_name}, {worker_name})"):
             try:
-                return await self.__worker_tasks__[concat_worker_name(plugin_name, worker_name)].get_result()
+                return await self._worker_tasks[concat_worker_name(plugin_name, worker_name)].get_result()
             except Exception as e:
                 raise UnsatisfiedDependencyException(plugin_name, worker_name) from e
 
         return None
 
     async def get_all_results(self):
-        return await self.__worker_tasks__.run()
+        return {**await self._worker_tasks.run(), "companies": [company.export() for company in self._discovered_companies]}
 
     async def get_remaining_workers(self, ignore_self=False):
-        return [name for name, worker in self.__worker_tasks__.items() if
+        return [name for name, worker in self._worker_tasks.items() if
                 worker.running and (not ignore_self or worker != scheduler.current_coroutine())]
 
     async def collect(self, key, size=10):
@@ -198,20 +283,58 @@ class TaskContext:
         logging.debug(f"Finished collecting {key}")
 
     def __repr__(self):
-        return f"TaskContext(futures={{{self.__futures__}}}, finished_plugins={{{self.__finished_plugins__}}})"
+        return f"TaskContext(futures={{{self._futures}}}, finished_plugins={{{self._finished_plugins}}})"
 
     def get_plugin_config(self, plugin_name):
-        if plugin_name not in self.__plugin_config__:
-            self.__plugin_config__[plugin_name] = {}
+        if plugin_name not in self._plugin_config:
+            self._plugin_config[plugin_name] = {}
 
-        return self.__plugin_config__[plugin_name]
+        return self._plugin_config[plugin_name]
 
     def log(self, msg):
-        self.__log__.append(msg)
+        self._log.append(msg)
 
     def get_log(self):
-        return self.__log__
+        return self._log
 
+    def put_company(self, company: Company):
+        if company in self._discovered_companies:
+            return
+        self._discovered_companies.append(company)
+
+    def find_discovered_asset(self, host: str, port: int, layer4_proto: int) -> Asset:
+        potential_companies = [company for company, weight in self.find_by_target(host) if weight >= 1]
+        for company in potential_companies:
+            for asset in company.assets:
+                if asset.host == host and asset.port == port and asset.layer4_protocol == layer4_proto:
+                    return asset
+
+        raise ValueError(f"Asset not found for {host}:{port} with protocol {layer4_proto}")
+
+    def put_relation(self, company: Company, target: Any, weight: float):
+        if weight <= 0:
+            return
+        if weight > 1:
+            weight = 1
+
+        if target in self._company_relationship:
+            self._company_relationship[target] = { company: weight }
+        else:
+            self._company_relationship[target][company] = weight
+
+    def find_by_target(self, target: Any) -> list[tuple[Company, float]]:
+        return list(self._company_relationship[target])
+
+    def get_relation_weight(self, company: Company, target: Any) -> float:
+        if not self._company_relationship[target]:
+            return 0
+        if not self._company_relationship[target][company]:
+            return 0
+
+        return self._company_relationship[target][company]
+
+    def get_discovered_companies(self):
+        return self._discovered_companies
 
 class ThreadLoguruHook(logging.Handler):
     def __init__(self, target_thread, cb):
