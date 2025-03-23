@@ -323,7 +323,7 @@ class TaskContext:
             self._company_relationship[target][company] = weight
 
     def find_by_target(self, target: Any) -> list[tuple[Company, float]]:
-        return list(self._company_relationship[target])
+        return sorted(list(self._company_relationship[target]), lambda c, w: w, reverse=True)
 
     def get_relation_weight(self, company: Company, target: Any) -> float:
         if not self._company_relationship[target]:
