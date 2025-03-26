@@ -4,8 +4,8 @@ __event_futures__ = {}
 import asyncio
 
 from diamond_shovel.plugins.manage import is_plugin_enabled
-from diamond_shovel.utils.func import async_helper
-from diamond_shovel.utils.func.async_helper import timed_await
+from diamond_shovel.utils import async_helper
+from diamond_shovel.utils.async_helper import timed_await
 
 
 class Event:

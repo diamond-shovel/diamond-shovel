@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from websocket import WebSocket
 
 from diamond_shovel.function.task import WorkerPool, TaskContext
-from diamond_shovel.utils.func import async_helper
+from diamond_shovel.utils import async_helper
 
 router = APIRouter(prefix="/task", tags=["task"])
 

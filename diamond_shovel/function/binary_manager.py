@@ -7,7 +7,8 @@ import threading
 import traceback
 from contextlib import contextmanager
 
-from diamond_shovel.utils.func import retry, async_helper
+from diamond_shovel.utils import retry
+from diamond_shovel.utils import async_helper
 
 metadata_file = 'BinaryMetadata.json'
 

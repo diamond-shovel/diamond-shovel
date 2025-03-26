@@ -24,7 +24,7 @@ from kink import inject, di, Container
 
 from diamond_shovel.function.binary_manager import BinaryManager
 from diamond_shovel.plugins import library
-from diamond_shovel.utils.func import async_helper
+from diamond_shovel.utils import async_helper
 
 
 class PluginInitContext:

@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from queue import PriorityQueue
 from typing import Callable
 
-from diamond_shovel.utils.func import async_helper
+from diamond_shovel.utils import async_helper
 
 
 class ShovelCoroutine:

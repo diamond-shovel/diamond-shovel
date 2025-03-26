@@ -14,10 +14,10 @@ from kink import di, inject
 
 import diamond_shovel.config
 import diamond_shovel.slave.server
-import diamond_shovel.utils.func
+import diamond_shovel.utils
 from diamond_shovel.cli import historian
 from diamond_shovel.function.binary_manager import BinaryManager
-from diamond_shovel.utils.func import json_util
+from diamond_shovel.utils import json_util
 
 
 @inject

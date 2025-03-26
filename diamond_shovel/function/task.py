@@ -4,105 +4,23 @@ import logging
 import random
 import threading
 from asyncio import Future, current_task
-from typing import Callable, Any, Coroutine, Optional
+from typing import Callable, Any, Coroutine
 
 import loguru
 
 import diamond_shovel.plugins.load
 import diamond_shovel.plugins.manage
+from diamond_shovel.utils.async_helper import call_async
+from diamond_shovel.utils.network import Graph
 from . import scheduler
 from .scheduler import CoroutineQueue, ShovelCoroutine
 from ..plugins import events, PluginInitContext, manage
-from ..utils.func import async_helper, json_util
-from ..utils.func.async_helper import call_async
+from ..utils import async_helper
 
 
 class WorkerException(Exception):
     pass
 
-class Vulnerability(json_util.JsonExportable):
-    def __init__(self, name: str, description: str, severity: str, references: list[str]):
-        self.name = name
-        self.description = description
-        self.severity = severity
-        self.references = references
-
-    def export(self) -> dict:
-        return {
-            "name": self.name,
-            "description": self.description,
-            "severity": self.severity,
-            "references": self.references
-        }
-
-class Asset(json_util.JsonExportable):
-    def __init__(self, owner: 'Company', host: str, port: int, layer4_protocol: int):
-        self.owner = owner
-        self.owner.add_asset(self)
-
-        self.host = host
-        self.port = port
-        self.layer4_protocol = layer4_protocol
-
-        self.identified_service = ""
-        self.signature = ""
-
-        self.discovered_techniques = []
-        self.vulnerabilities = []
-
-    def put_identified_service(self, service: str):
-        self.identified_service = service
-
-    def put_signature(self, signature: str):
-        self.signature = signature
-
-    def add_discovered_technique(self, technique: str):
-        if technique not in self.discovered_techniques:
-            self.discovered_techniques.append(technique)
-
-    def add_vulnerability(self, vulnerability: Vulnerability):
-        if vulnerability not in self.vulnerabilities:
-            self.vulnerabilities.append(vulnerability)
-
-    def export(self):
-        return {
-            "owner": self.owner.company_name,
-            "host": self.host,
-            "port": self.port,
-            "layer4_protocol": self.layer4_protocol,
-            "identified_service": self.identified_service,
-            "signature": self.signature,
-            "discovered_techniques": self.discovered_techniques,
-            "vulnerabilities": [vuln.export() for vuln in self.vulnerabilities]
-        }
-
-class Company(json_util.JsonExportable):
-    def __init__(self, company_name: str):
-        self.company_name = company_name
-        self.assets = []
-        self._assigned_task: Optional['TaskContext'] = None
-
-    def get_relation_to(self, target: Any) -> float:
-        if self._assigned_task is None:
-            raise ValueError("Company has not assigned to a task. Use `TaskContext#put_company` first.")
-        return self._assigned_task.get_relation_weight(self, target)
-
-    def add_asset(self, asset: Asset):
-        if asset not in self.assets:
-            self.assets.append(asset)
-
-        self._assigned_task.put_relation(self, asset, 1)
-
-    def add_relationship(self, target: Any, weight: float):
-        if self._assigned_task is None:
-            raise ValueError("Company has not assigned to a task. Use `TaskContext#put_company` first.")
-        self._assigned_task.put_relation(self, target, weight)
-
-    def export(self):
-        return {
-            "company_name": self.company_name,
-            "assets": [asset.export() for asset in self.assets]
-        }
 
 class UnsatisfiedDependencyException(Exception):
     def __init__(self, plugin_name, worker_name):
@@ -132,7 +50,7 @@ class TaskContext:
         self._plugin_config = {}
         self._log = []
         self._discovered_companies = []
-        self._company_relationship: dict[Any, list[dict[Company, float]]] = {}
+        self.asset_graph: Graph = Graph()
 
     def start(self, workers):
         if self._worker_tasks is not None:
@@ -216,7 +134,7 @@ class TaskContext:
         return None
 
     async def get_all_results(self):
-        return {**await self._worker_tasks.run(), "companies": [company.export() for company in self._discovered_companies]}
+        return {**await self._worker_tasks.run(), "asset_graph": self.asset_graph}
 
     async def get_remaining_workers(self, ignore_self=False):
         return [name for name, worker in self._worker_tasks.items() if
@@ -297,46 +215,7 @@ class TaskContext:
     def get_log(self):
         return self._log
 
-    def put_company(self, company: Company):
-        if company in self._discovered_companies:
-            return
-        self._discovered_companies.append(company)
-
-    def find_discovered_asset(self, host: str, port: int, layer4_proto: int) -> Asset:
-        potential_companies = [company for company, weight in self.find_by_target(host) if weight >= 1]
-        for company in potential_companies:
-            for asset in company.assets:
-                if asset.host == host and asset.port == port and asset.layer4_protocol == layer4_proto:
-                    return asset
-
-        raise ValueError(f"Asset not found for {host}:{port} with protocol {layer4_proto}")
-
-    def put_relation(self, company: Company, target: Any, weight: float):
-        if weight <= 0:
-            return
-        if weight > 1:
-            weight = 1
-
-        if target in self._company_relationship:
-            self._company_relationship[target] = { company: weight }
-        else:
-            self._company_relationship[target][company] = weight
-
-    def find_by_target(self, target: Any) -> list[tuple[Company, float]]:
-        return sorted(list(self._company_relationship[target]), lambda c, w: w, reverse=True)
-
-    def get_relation_weight(self, company: Company, target: Any) -> float:
-        if not self._company_relationship[target]:
-            return 0
-        if not self._company_relationship[target][company]:
-            return 0
-
-        return self._company_relationship[target][company]
-
-    def get_discovered_companies(self):
-        return self._discovered_companies
-
-class ThreadLoguruHook(logging.Handler):
+class _ThreadLoguruHook(logging.Handler):
     def __init__(self, target_thread, cb):
         self._target_thread = target_thread
         self._cb = cb
@@ -383,7 +262,7 @@ class WorkerPool:
             loguru_handler_id = None
             if loguru_handler is not None:
                 current_thread = threading.current_thread()
-                loguru_handler_id = loguru.logger.add(sink=ThreadLoguruHook(current_thread, loguru_handler))
+                loguru_handler_id = loguru.logger.add(sink=_ThreadLoguruHook(current_thread, loguru_handler))
 
             try:
                 async with asyncio.TaskGroup() as tg:
