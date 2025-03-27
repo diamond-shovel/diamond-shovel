@@ -15,10 +15,8 @@ class Graph(json_util.JsonExportable):
         if weight > 1:
             weight = 1
 
-        if src not in self._nodes:
-            self._nodes[src] = {}
-        if dist not in self._nodes:
-            self._nodes[dist] = {}
+        src = self.stored(src)
+        dist = self.stored(dist)
 
         edge = {'src': hash(src), 'dist': hash(dist), 'weight': weight}
         self.edges.append(edge)
