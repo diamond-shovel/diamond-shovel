@@ -1,4 +1,5 @@
-from typing import Any, Callable
+import uuid
+from typing import Any, Callable, Optional
 
 from diamond_shovel.utils import json_util
 
@@ -30,12 +31,13 @@ class Vulnerability(json_util.JsonExportable):
 
 
 class Asset(json_util.JsonExportable):
-    def __init__(self, owner: 'Company', host: str, port: int, layer4_protocol: int):
+    def __init__(self, owner: 'Company', host: str, port: int, layer4_protocol: int, proxied_key: Optional[uuid.UUID] = None):
         self.owner = owner
 
         self.host = host
         self.port = port
         self.layer4_protocol = layer4_protocol
+        self.proxied_key = proxied_key
 
         self.identified_service = None
         self.signature = []
@@ -50,6 +52,7 @@ class Asset(json_util.JsonExportable):
             "layer4_protocol": self.layer4_protocol,
             "identified_service": self.identified_service,
             "signature": self.signature,
+            "proxy_key": self.proxied_key,
             "suggested_techniques": self.suggested_techniques,
             "vulnerabilities": [vuln.export() for vuln in self.vulnerabilities],
             "hash": hash(self),
@@ -61,10 +64,11 @@ class Asset(json_util.JsonExportable):
             return False
         return (self.host == other.host and
                 self.port == other.port and
-                self.layer4_protocol == other.layer4_protocol)
+                self.layer4_protocol == other.layer4_protocol and
+                self.proxied_key == other.proxied_key)
 
     def __hash__(self) -> int:
-        return hash(self.host + str(self.port) + str(self.layer4_protocol))
+        return hash(self.host + str(self.port) + str(self.layer4_protocol) + str(self.proxied_key))
 
 
 class Company(json_util.JsonExportable):
