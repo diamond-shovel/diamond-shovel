@@ -10,6 +10,9 @@ class Graph(json_util.JsonExportable):
         self._nodes = {}
 
     def add_edge(self, src, dist, weight: float):
+        if src == dist: # we do not want a closure.
+            return
+
         if weight < 0:
             weight = 0
         if weight > 1:

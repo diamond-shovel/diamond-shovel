@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from diamond_shovel.utils import json_util
 
@@ -31,9 +31,7 @@ class Vulnerability(json_util.JsonExportable):
 
 
 class Asset(json_util.JsonExportable):
-    def __init__(self, owner: 'Company', host: str, port: int, layer4_protocol: int, proxied_key: Optional[uuid.UUID] = None):
-        self.owner = owner
-
+    def __init__(self, host: str, port: int, layer4_protocol: int, proxied_key: Optional[uuid.UUID] = None):
         self.host = host
         self.port = port
         self.layer4_protocol = layer4_protocol
@@ -75,9 +73,6 @@ class Company(json_util.JsonExportable):
     def __init__(self, company_name: str):
         self.company_name = company_name
         self._assigned_task = None
-
-    def get_relation_to(self, target: Any, filt: Callable[[Any], bool] = lambda: True) -> float:
-        return self._assigned_task.asset_graph.traverse(self, target, filt)
 
     def export(self):
         return {
