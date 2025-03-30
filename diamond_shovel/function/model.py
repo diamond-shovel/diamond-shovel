@@ -42,6 +42,7 @@ class Asset(json_util.JsonExportable):
 
         self.suggested_techniques = []
         self.vulnerabilities = []
+        self.details = {}
 
     def export(self):
         return {
@@ -54,6 +55,7 @@ class Asset(json_util.JsonExportable):
             "suggested_techniques": self.suggested_techniques,
             "vulnerabilities": [vuln.export() for vuln in self.vulnerabilities],
             "hash": hash(self),
+            "details": self.details,
             "type": "diamond_shovel.function.task.Asset"
         }
 
