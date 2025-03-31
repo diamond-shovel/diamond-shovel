@@ -1,6 +1,5 @@
 import argparse
 import asyncio
-import base64
 import json
 import logging
 import multiprocessing
@@ -9,8 +8,7 @@ import pathlib
 import sys
 from concurrent.futures.thread import ThreadPoolExecutor
 
-import loguru
-from kink import di, inject
+from kink import di
 
 import diamond_shovel.config
 import diamond_shovel.slave.server
@@ -20,22 +18,7 @@ from diamond_shovel.function.binary_manager import BinaryManager
 from diamond_shovel.utils import json_util
 
 
-@inject
-def iter_plugin_files(data_path: pathlib.Path):
-    """
-    List all plugins in the data path
-    :param data_path: The data path
-    :return: A list of plugins,containing the plugin file path
-    """
-    plugin_path = data_path / "plugins"
-    loguru.logger.debug(f"Current plugins path:{plugin_path}")
-    if not plugin_path.exists():
-        return []
-    return [f for f in plugin_path.iterdir() if f.is_file() and (".tar" in f.suffixes or f.suffix == ".ore")]
-
 def main():
-    diamond_shovel.utils.func.init()
-
     parser = argparse.ArgumentParser(prog=sys.argv[0],
                                      description="资产扫描及漏洞发现工具")
 
@@ -61,10 +44,6 @@ def main():
     if args.plugin:
         install_plugin(args)
 
-    # If users need to list plugins
-    if args.plugin_list:
-        list_plugins()
-
     if os.geteuid() == 0:
         start_root_daemon()
 
@@ -81,15 +60,6 @@ def main():
         diamond_shovel.slave.server.start_api_slave(args.daemon_url)
     else:
         run_once(args, blacklist, whitelist)
-
-
-def list_plugins():
-    logging.info("Found plugin files: ")
-    print('-' * 20)
-    for plugin in iter_plugin_files():
-        logging.info(f"|--{plugin}")
-    print('-' * 20)
-    sys.exit(0)
 
 
 def init_parser_arguments(parser):
@@ -136,14 +106,6 @@ def run_once(args, blacklist, whitelist):
     task.init()
     ctx = task.TaskContext()
 
-    if args.extras:
-        extras = json.loads(base64.b64decode(args.extras).decode('utf-8'))
-    else:
-        extras = {}
-
-    for key, value in extras.items():
-        ctx[key] = value
-
     def merge_list(ctx, key, value):
         if key in ctx:
             tmp = ctx[key]
@@ -155,24 +117,6 @@ def run_once(args, blacklist, whitelist):
     merge_list(ctx, "target_companies", target_companies)
     merge_list(ctx, "target_domains", target_domains)
     merge_list(ctx, "target_ips", target_ips)
-    if args.config:
-        config = json.loads(base64.b64decode(args.config).decode('utf-8'))
-    else:
-        config = {}
-
-    logging.debug(f"Starting with config: {config}")
-
-    for plugin_name, plugin_config in config.items():
-        cfg = ctx.get_plugin_config(plugin_name)
-        for section, values in plugin_config.items():
-            if section not in cfg:
-                cfg[section] = {}
-            for key, value in values.items():
-                if value is None or len(str(value)) == 0:
-                    continue
-
-                if key not in cfg[section]:
-                    cfg[section][key] = str(value)
 
     with open(args.out_json, "w") as f:
         scan_result = asyncio.run(task.run_full_scan(ctx))
@@ -182,7 +126,7 @@ def run_once(args, blacklist, whitelist):
             scan_result['deserialization_failure'] = e
             f.write(json.dumps(scan_result, indent=4, cls=json_util.ExceptionExtendedEncoder, skipkeys=True))
     out_json_abs_path = os.path.abspath(args.out_json)
-    loguru.logger.success(f"Output json file path: {out_json_abs_path}")
+    logging.info(f"Output json file path: {out_json_abs_path}")
 
 
 def start_root_daemon():

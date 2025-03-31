@@ -78,3 +78,6 @@ class Graph(json_util.JsonExportable):
             [to_visit.put((neighbor, weight * edge_weight)) for neighbor, edge_weight in self._nodes[node].items() if neighbor not in visited]
 
         return sorted([(node, weight) for node, weight in visited if predicate(node)], lambda body, weight: weight, reverse=True)
+
+    def has_node(self, node: Any) -> bool:
+        return node in self._nodes
