@@ -2,7 +2,7 @@ import multiprocessing
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, HTTPException
 from pydantic import BaseModel
 from websocket import WebSocket
 
@@ -42,7 +42,7 @@ def new_task(target: Annotated[TargetRequest, Body(embed=True)]):
 @router.get('/{scan_id}')
 async def get_task(scan_id: uuid.UUID):
     if scan_id not in scan_session:
-        return {"error": "Scan not found"}
+        raise HTTPException(status_code=404, detail="Scan session not found")
 
     return {
         "state": scan_session[scan_id]["state"],
@@ -61,7 +61,7 @@ def delete_task(scan_id: uuid.UUID):
 @router.post('/{scan_id}')
 def update_task_args(params: dict, scan_id: uuid.UUID):
     if scan_id not in scan_session:
-        return {"error": "Scan not found"}
+        raise HTTPException(status_code=404, detail="Scan session not found")
 
     for key, value in params.items():
         scan_session[scan_id]["ctx"][key] = value
@@ -69,7 +69,7 @@ def update_task_args(params: dict, scan_id: uuid.UUID):
 @router.get('/{scan_id}/start')
 def start_task(scan_id: uuid.UUID):
     if scan_id not in scan_session:
-        return {"error": "Scan session not found"}
+        raise HTTPException(status_code=404, detail="Scan session not found")
 
     def log_hook(log):
         scan_session[scan_id]["last_line"] = log
@@ -86,6 +86,9 @@ def start_task(scan_id: uuid.UUID):
 
 @router.websocket('/ws/{scan_id}')
 def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
+    if scan_id not in scan_session:
+        raise HTTPException(status_code=404, detail="Scan session not found")
+
     while scan_session[scan_id]["state"] == "running":
         scan_session[scan_id]["log_condition"].acquire()
         scan_session[scan_id]["log_condition"].wait()
