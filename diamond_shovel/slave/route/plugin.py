@@ -15,7 +15,8 @@ def list_plugins():
             "version": diamond_shovel.plugins.manage.plugin_table[plugin_name]["version"],
             "tags": diamond_shovel.plugins.manage.plugin_table[plugin_name]["tags"],
             "description": diamond_shovel.plugins.manage.plugin_table[plugin_name]["description"],
-            "help": diamond_shovel.plugins.manage.plugin_table[plugin_name]["help"]
+            "help": diamond_shovel.plugins.manage.plugin_table[plugin_name]["help"],
+            "tag_soft_depends": diamond_shovel.plugins.manage.plugin_table[plugin_name]["tag_soft_depends"]
         }
     return result
 
@@ -40,5 +41,6 @@ def get_plugin(plugin_name: str):
         "version": diamond_shovel.plugins.manage.plugin_table[plugin_name]["version"],
         "tags": diamond_shovel.plugins.manage.plugin_table[plugin_name]["tags"],
         "description": diamond_shovel.plugins.manage.plugin_table[plugin_name]["description"],
-        "help": diamond_shovel.plugins.manage.plugin_table[plugin_name]["help"]
+        "help": diamond_shovel.plugins.manage.plugin_table[plugin_name]["help"],
+        "tag_soft_depends": diamond_shovel.plugins.manage.plugin_table[plugin_name]["tag_soft_depends"]
     }

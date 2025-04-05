@@ -264,7 +264,8 @@ def make_plugin(config, dependencies, entrypoint, help, name, tar, version):
         "version": version,
         "help": help,
         "tags": config["plugin"].get("tags", "").split(" "),
-        "description": config["plugin"].get("description")
+        "description": config["plugin"].get("description"),
+        "tag_soft_depends": config["plugin"].get("tag_soft_depends", "").split(" ")
     }
 
 
