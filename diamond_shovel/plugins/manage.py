@@ -8,6 +8,8 @@ from kink import inject
 from .load import load_plugin_plain, generate_enable_order
 
 
+plugin_table: dict[str, dict] = {}
+
 @inject
 def load_plugins(data_path: pathlib.Path, whitelist: list[str] = None, blacklist: list[str] = None):
     plugin_path = data_path / "plugins"
@@ -82,8 +84,3 @@ def set_plugin_enabled(plugin_name: str, enabled: bool):
 
 def is_plugin_enabled(plugin_name: str):
     return plugin_table[plugin_name].get("enabled", False)
-
-
-plugin_table: dict[str, dict] = {}
-
-
