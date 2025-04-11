@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=78.1.0", "setuptools-scm>=8.2.1"]
+requires = ["setuptools>=78.1.0", "setuptools-scm>=8.2.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -15,7 +15,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: Information Technology",
     "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
     "Programming Language :: Python :: 3",
     "Topic :: Security",
     "Topic :: Software Development :: Libraries",
@@ -62,7 +61,7 @@ dependencies = [
 ]
 
 [tool.setuptools_scm]
-version_file = "diamond-shovel/version.py"
+version_file = "diamond_shovel/version.py"
 
 [project.urls]
 Homepage = "https://www.hscsec.cn"
