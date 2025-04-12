@@ -28,6 +28,7 @@ WORKDIR /data
 
 # 安装 python 依赖
 COPY requirements.txt /data/requirements.txt
-RUN pip3 install build -i https://pypi.tuna.tsinghua.edu.cn/simple --break-system-packages
+RUN pip config set global.index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+RUN pip3 install build --break-system-packages
 RUN python3 -m build -w
 RUN pip3 install ./dist/*.whl -i https://pypi.tuna.tsinghua.edu.cn/simple --break-system-packages
