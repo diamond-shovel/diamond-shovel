@@ -6,7 +6,7 @@ import shutil
 from . import config_generation
 
 
-def perform_installation(root: pathlib.Path):
+def perform_installation(root: pathlib.Path = pathlib.Path("/")):
     if os.getuid() != 0:
         raise PermissionError("请以root权限运行安装程序")
 
@@ -18,6 +18,9 @@ def perform_installation(root: pathlib.Path):
     if (root / "etc" / "diamond-shovel" / "diamond-shovel.ini").exists():
         logging.error("已经安装过了")
         return
+
+    logging.info("创建用户...")
+    install_user()
 
     logging.info("创建配置文件...")
     install_config(root)
@@ -82,3 +85,11 @@ def perform_removal(root: pathlib.Path):
     config_folder.unlink()
 
     logging.info("卸载完成")
+
+def install_user():
+    try:
+        os.system("useradd -r -s /bin/nologin diamond-shovel")
+        os.system("groupadd -r diamond-shovel")
+        os.system("usermod -aG diamond-shovel diamond-shovel")
+    except Exception as e:
+        logging.error(f"创建用户失败: {e}")
