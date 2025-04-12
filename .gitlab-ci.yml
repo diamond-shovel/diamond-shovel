@@ -1,0 +1,43 @@
+stages:
+  - build
+  - build-docker
+  - webhook
+
+build:
+  stage: build
+  image: gitlab.cyberspike.top:5050/docker/python
+  script:
+    - sed -i 's|http://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; s|http://deb.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g' /etc/apt/sources.list.d/debian.sources && apt-get update && apt-get install -y patchelf
+    - pip install -r requirements.txt --break-system-packages
+    - pip install Nuitka --break-system-packages
+    - nuitka wrapped_main.py --follow-import-to=diamond_shovel --no-deployment-flag=self-execution
+  tags:
+    - docker
+  artifacts:
+    paths:
+      - wrapped_main.bin
+
+build-docker:
+  stage: build-docker
+  image: gitlab.cyberspike.top:5050/docker/docker:dind
+  services:
+    - name: gitlab.cyberspike.top:5050/docker/docker:dind
+      alias: docker
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
+  tags:
+    - docker
+  script:
+    - docker build -t gitlab.cyberspike.top:5050/aszl/diamond-shovel/shovel:$CI_COMMIT_REF_NAME .
+    - docker push gitlab.cyberspike.top:5050/aszl/diamond-shovel/shovel:$CI_COMMIT_REF_NAME
+webhook:
+  stage: webhook
+  image: gitlab.cyberspike.top:5050/docker/alpine/curl:8.9.1
+  script:  |
+    curl -X POST -H "Content-Type: application/json" -d '{"project_name": "shovel", "branch_name": "'${CI_COMMIT_REF_NAME}'"}' http://192.168.26.9:2333/update_branch
+    curl -X POST --fail -F token=$CI_JOB_TOKEN -F ref=$CI_COMMIT_REF_NAME https://gitlab.cyberspike.top/api/v4/projects/65/trigger/pipeline
+  tags:
+    - docker
