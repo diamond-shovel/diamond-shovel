@@ -88,7 +88,7 @@ def perform_removal(root: pathlib.Path):
 
 def install_user():
     try:
-        os.system("useradd -r -s /bin/nologin diamond-shovel")
+        os.system("useradd -r -s /bin/false diamond-shovel")
         os.system("groupadd -r diamond-shovel")
         os.system("usermod -aG diamond-shovel diamond-shovel")
     except Exception as e:
