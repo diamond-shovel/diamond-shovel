@@ -26,7 +26,7 @@ RUN echo "Asia/Shanghai" > /etc/timezone
 # 设置工作目录
 WORKDIR /data
 
-RUN pip config set global.index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple && \
-    pip3 install build --break-system-packages && \
-    python3 -m build -w && \
-    pip3 install ./dist/*.whl --break-system-packages
+RUN pip config set global.index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+RUN pip3 install build --break-system-packages
+RUN python3 -m build -wn
+RUN pip3 install ./dist/*.whl --break-system-packages
