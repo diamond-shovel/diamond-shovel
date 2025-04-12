@@ -2,9 +2,8 @@ import multiprocessing
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, WebSocket
 from pydantic import BaseModel
-from websocket import WebSocket
 
 from diamond_shovel.function.task import WorkerPool, TaskContext
 from diamond_shovel.utils.func import async_helper
