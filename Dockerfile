@@ -29,7 +29,7 @@ WORKDIR /data
 RUN pip config set global.index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple && \
     pip3 install build --break-system-packages && \
     python3 -m build -wn && \
-    pip3 install ./dist/*.whl --break-system-packages \
+    pip3 install ./dist/*.whl --break-system-packages
 
 RUN diamond-shovel -I
 
