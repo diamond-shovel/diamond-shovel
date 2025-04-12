@@ -31,8 +31,8 @@ build-docker:
   tags:
     - docker
   script:
-    - docker build -t gitlab.cyberspike.top:5050/aszl/diamond-shovel/shovel:$CI_COMMIT_REF_NAME .
-    - docker push gitlab.cyberspike.top:5050/aszl/diamond-shovel/shovel:$CI_COMMIT_REF_NAME
+    - docker build -t gitlab.cyberspike.top:5050/aszl/diamond-shovel/shovel:$(echo -n "$CI_COMMIT_REF_NAME" |  sed 's/[^a-zA-Z0-9._-]/_/g') .
+    - docker push gitlab.cyberspike.top:5050/aszl/diamond-shovel/shovel:$(echo -n "$CI_COMMIT_REF_NAME" |  sed 's/[^a-zA-Z0-9._-]/_/g')
 webhook:
   stage: webhook
   image: gitlab.cyberspike.top:5050/docker/alpine/curl:8.9.1
