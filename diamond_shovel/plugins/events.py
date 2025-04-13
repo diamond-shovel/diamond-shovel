@@ -87,6 +87,24 @@ class TaskWriteTriggerEvent(TaskEvent):
         self.value = value
         self.old_value = old_value
 
+class TaskLogEvent(TaskEvent):
+    def __init__(self, task_context, log_line):
+        super().__init__(task_context)
+        self.log_line = log_line
+
+
+class TaskWorkerStateChangedEvent(TaskEvent):
+    def __init__(self, task_context, handler_states: dict[str, dict[str, str]], changed: dict[str, dict[str, str]]):
+        super().__init__(task_context)
+        self.handler_states = handler_states
+        self.changed = changed
+
+
+class TaskFinishedEvent(TaskEvent):
+    def __init__(self, task_context, error):
+        super().__init__(task_context)
+        self.error = error
+
 
 def register_event(init_ctx, evt_class, handler):
     """
@@ -110,19 +128,37 @@ def call_event(evt):
         raise TypeError("evt must be an instance of Event")
     if evt.__class__ not in __event_handlers__:
         return
-    for init_ctx, handlers in __event_handlers__[evt.__class__].items():
-        if not is_plugin_enabled(init_ctx.plugin_name):
+    call_listeners(evt)
+    wake_monitors(evt)
+
+
+def call_listeners(evt):
+    for cls in _list_parent_classes(evt.__class__):
+        for init_ctx, handlers in __event_handlers__[cls].items():
+            if not is_plugin_enabled(init_ctx.plugin_name):
+                continue
+            with init_ctx.attach():
+                for handler in handlers:
+                    handle_result = handler(evt)
+                    if asyncio.iscoroutine(handle_result):
+                        async_helper.call_async(handle_result)
+
+
+def wake_monitors(evt):
+    for cls in _list_parent_classes(evt.__class__):
+        if cls in __event_futures__:
+            for future in __event_futures__[cls]:
+                future.set_result(evt)
+
+
+def _list_parent_classes(cls):
+    parents = []
+    parents.append(cls)
+    for base in cls.__bases__:
+        if not issubclass(base, Event):
             continue
-        with init_ctx.attach():
-            for handler in handlers:
-                handle_result = handler(evt)
-                if asyncio.iscoroutine(handle_result):
-                    async_helper.call_async(handle_result)
-
-    if evt.__class__ in __event_futures__:
-        for future in __event_futures__[evt.__class__]:
-            future.set_result(evt)
-
+        parents += _list_parent_classes(base)
+    return parents
 
 async def wait_event(evt_class, evt_filter = lambda evt: True, timeout = 2147483647):
     """

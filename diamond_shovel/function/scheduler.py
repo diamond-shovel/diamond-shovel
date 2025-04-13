@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from queue import PriorityQueue
 from typing import Callable
 
+from diamond_shovel.plugins import events
 from diamond_shovel.utils.func import async_helper
 
 
@@ -156,10 +157,26 @@ class CoroutineQueue:
     async def run(self):
         task_set = []
 
-        def complete(_):
-            done_task_count = len([item for item in self._name_map_.values() if item.done])
-            total_task_count = len(self._name_map_)
-            print(f"{{{{plugin_progress: {float(done_task_count / total_task_count)} }}}}")
+        def complete(coro):
+            events.call_event(events.TaskWorkerStateChangedEvent(coro.ctx,
+                                                                 {
+                                                                name: {
+                                                                    "state": "waiting" if target_coro.waiting else (
+                                                                        "done" if target_coro.done else
+                                                                        ("cancelled" if target_coro.cancelled else
+                                                                         "running")),
+                                                                    "wait_reason": target_coro._park_reason
+                                                                } for name, target_coro in self._name_map_
+                                                            },
+                                                                 {
+                                                                coro._name: {
+                                                                    "state": "waiting" if coro.waiting else (
+                                                                        "done" if coro.done else
+                                                                        ("cancelled" if coro.cancelled else
+                                                                         "running")),
+                                                                    "wait_reason": coro._park_reason
+                                                                }
+                                                            }))
 
         while not self._queue_.empty():
             _, item = self._queue_.get_nowait()

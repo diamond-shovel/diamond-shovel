@@ -131,7 +131,10 @@ class TaskContext:
         return None
 
     async def get_all_results(self):
-        return await self.__worker_tasks__.run()
+        try:
+            return await self.__worker_tasks__.run()
+        finally:
+            events.call_event(events.TaskFinishedEvent(self))
 
     async def get_remaining_workers(self, ignore_self=False):
         return [name for name, worker in self.__worker_tasks__.items() if
@@ -214,15 +217,15 @@ class TaskContext:
 
 
 class ThreadLoguruHook(logging.Handler):
-    def __init__(self, target_thread, cb):
+    def __init__(self, target_thread, task_context):
         self._target_thread = target_thread
-        self._cb = cb
+        self._task_context = task_context
 
     def filter(self, record):
         return record.thread == self._target_thread
 
     def emit(self, record):
-        self._cb(self.format(record))
+        events.call_event(events.TaskLogEvent(self._task_context, self.format(record)))
 
 
 class WorkerPool:
@@ -251,16 +254,14 @@ class WorkerPool:
                 for worker in workers]
 
     async def run_worker(self, ctx_target_companies: TaskContext | list[str], target_domains: list[str] = None,
-                         target_ips: list[str] = None, loguru_handler: Callable[[str], None] | None = None):
+                         target_ips: list[str] = None):
         ctx = ctx_target_companies \
             if isinstance(ctx_target_companies, TaskContext) \
             else await initialize_task_context(ctx_target_companies, target_domains, target_ips)
 
         with loguru.logger.contextualize():
-            loguru_handler_id = None
-            if loguru_handler is not None:
-                current_thread = threading.current_thread()
-                loguru_handler_id = loguru.logger.add(sink=ThreadLoguruHook(current_thread, loguru_handler))
+            current_thread = threading.current_thread()
+            loguru_handler_id = loguru.logger.add(sink=ThreadLoguruHook(current_thread, ctx))
 
             try:
                 async with asyncio.TaskGroup() as tg:
@@ -281,8 +282,7 @@ class WorkerPool:
 
                     return await ctx.get_all_results()
             finally:
-                if loguru_handler_id is not None:
-                    loguru.logger.remove(loguru_handler_id)
+                loguru.logger.remove(loguru_handler_id)
 
 
 worker_pool = WorkerPool()
