@@ -6,7 +6,7 @@ import shutil
 from . import config_generation
 
 
-def perform_installation(root: pathlib.Path):
+def perform_installation(root: pathlib.Path = pathlib.Path('/')):
     if os.getuid() != 0:
         raise PermissionError("请以root权限运行安装程序")
 
@@ -61,7 +61,7 @@ def install_config(root):
     config_generation.generate_config(config_folder)
 
 
-def perform_removal(root: pathlib.Path):
+def perform_removal(root: pathlib.Path = pathlib.Path('/')):
     if os.getuid() != 0:
         raise PermissionError("请以root权限运行安装程序")
 

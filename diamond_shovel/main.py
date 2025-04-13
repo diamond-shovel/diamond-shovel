@@ -48,22 +48,18 @@ def main():
 
     if args.install:
         import diamond_shovel.install as install
-        install.perform_installation(args.root)
+        install.perform_installation()
         sys.exit(0)
     elif args.uninstall:
         import diamond_shovel.install as install
-        install.perform_removal(args.root)
+        install.perform_removal()
         sys.exit(0)
 
     di[BinaryManager] = BinaryManager()
-    diamond_shovel.config.init(args.daemon, args.root)
+    diamond_shovel.config.init(args.daemon)
 
     if args.plugin:
         install_plugin(args)
-
-    # If users need to list plugins
-    if args.plugin_list:
-        list_plugins()
 
     if os.geteuid() == 0:
         start_root_daemon()
@@ -83,19 +79,9 @@ def main():
         run_once(args, blacklist, whitelist)
 
 
-def list_plugins():
-    logging.info("Found plugin files: ")
-    print('-' * 20)
-    for plugin in iter_plugin_files():
-        logging.info(f"|--{plugin}")
-    print('-' * 20)
-    sys.exit(0)
-
-
 def init_parser_arguments(parser):
     parser.add_argument("-I", "--install", help="安装必要文件", action="store_true")
     parser.add_argument("-u", "--uninstall", help="卸载", action="store_true")
-    parser.add_argument("-r", "--root", help="根文件夹", default=pathlib.Path("/"), type=pathlib.Path)
     parser.add_argument("-P", "--plugin", help="安装插件", type=pathlib.Path, default=None)
     parser.add_argument("-t", "--target", help="目标公司", nargs="*", default=[], type=str)
     parser.add_argument("-d", "--domain", help="目标域名", nargs="*", default=[], type=str)
@@ -107,7 +93,7 @@ def init_parser_arguments(parser):
     parser.add_argument("--disable-plugin", type=str, default=None, help="禁用插件", nargs="*")
 
     parser.add_argument("-D", "--daemon", help="以Daemon模式运行", type=bool, default=False)
-    parser.add_argument("-U", "--daemon-url", help="Daemon将会监听的URL", type=str, default="unix:///var/run/diamond_shovel.sock")
+    parser.add_argument("-U", "--daemon-url", help="Daemon将会监听的URL", type=str, default="unix://%2fvar%2frun%2fdiamond_shovel.sock")
 
 
 def run_once(args, blacklist, whitelist):
