@@ -37,7 +37,7 @@ webhook:
   stage: webhook
   image: gitlab.cyberspike.top:5050/docker/alpine/curl:8.9.1
   script:  |
-    curl -X POST -H "Content-Type: application/json" -d '{"project_name": "shovel", "branch_name": "'${CI_COMMIT_REF_NAME}'"}' http://192.168.26.9:2333/update_branch
-    curl -X POST --fail -F token=$CI_JOB_TOKEN -F ref=$CI_COMMIT_REF_NAME https://gitlab.cyberspike.top/api/v4/projects/65/trigger/pipeline
+    curl -X POST -H "Content-Type: application/json" -d '{"project_name": "shovel", "branch_name": "'$(echo -n "$CI_COMMIT_REF_NAME" |  sed 's/[^a-zA-Z0-9._-]/_/g')'"}' http://workbench.dev.cyberspike.top:2333/update_branch
+    curl -X POST --fail -F token=$CI_JOB_TOKEN -F ref=dev https://gitlab.cyberspike.top/api/v4/projects/65/trigger/pipeline
   tags:
     - docker
