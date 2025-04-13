@@ -100,7 +100,7 @@ def send_log_notification(ws: WebSocket, event: TaskLogEvent, _):
 def send_task_progress(ws: WebSocket, event: TaskWorkerStateChangedEvent, _):
     finished_tasks = len([task for task, state in event.handler_states.items() if state["state"] == "done" or state["state"] == "cancelled"])
     all_tasks = len(event.handler_states)
-    ws.send_text(f'{{"action":"task", "finished": {finished_tasks}, "all": {all_tasks}}}')
+    ws.send_text(f'{{"action":"state", "finished": {finished_tasks}, "all": {all_tasks}}}')
 
 def send_task_finish(ws: WebSocket, event: TaskFinishedEvent, session):
     ws.send_text(f'{{"action":"finished"}}')
