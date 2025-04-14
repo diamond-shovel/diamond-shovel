@@ -227,14 +227,18 @@ class ThreadLoguruHook(logging.Handler):
 
 class WorkerPool:
     def __init__(self):
-        self.__workers__: dict[
+        self._workers: dict[
             PluginInitContext, list[tuple[Callable[[TaskContext], Coroutine[Any, Any, Any]]], int]] = {}
 
     def register_worker(self, plugin_ctx: PluginInitContext, worker: Callable[[TaskContext], Coroutine[Any, Any, Any]],
                         nice=0):
-        if plugin_ctx not in self.__workers__:
-            self.__workers__[plugin_ctx] = []
-        self.__workers__[plugin_ctx].append((worker, nice))
+        if plugin_ctx not in self._workers:
+            self._workers[plugin_ctx] = []
+        self._workers[plugin_ctx].append((worker, nice))
+
+    def wipe_plugin_workers(self, target_plugin: PluginInitContext):
+        if target_plugin in self._workers:
+            del self._workers[target_plugin]
 
     def get_docs(self):
         def extract_doc(plugin, name):
@@ -247,7 +251,7 @@ class WorkerPool:
         return [(plugin_ctx.plugin_name, worker.__qualname__,
                  worker.__doc__ if worker.__doc__ and worker.__doc__.startswith("#worker_entry#") else extract_doc(
                      plugin_ctx, worker.__qualname__))
-                for plugin_ctx, workers in self.__workers__.items()
+                for plugin_ctx, workers in self._workers.items()
                 for worker in workers]
 
     async def run_worker(self, ctx_target_companies: TaskContext | list[str], target_domains: list[str] = None,
@@ -266,7 +270,7 @@ class WorkerPool:
                 async with asyncio.TaskGroup() as tg:
                     await async_helper.call_sync(events.call_event, events.TaskDispatchEvent(ctx))
                     all_tasks = CoroutineQueue()
-                    for plugin_ctx, workers in self.__workers__.items():
+                    for plugin_ctx, workers in self._workers.items():
                         if not manage.is_plugin_enabled(plugin_ctx.plugin_name):
                             continue
                         for worker, nice in workers:
