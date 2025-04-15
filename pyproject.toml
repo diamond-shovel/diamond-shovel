@@ -74,3 +74,4 @@ diamond-shovel = "diamond_shovel.main:main"
 
 [tool.setuptools]
 packages = ["diamond_shovel"]
+

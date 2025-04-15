@@ -56,14 +56,10 @@ def main():
         sys.exit(0)
 
     di[BinaryManager] = BinaryManager()
-    diamond_shovel.config.init(args.daemon)
+    diamond_shovel.config.init(args.daemon, args.daemon_config, args.daemon_workdir)
 
     if args.plugin:
         install_plugin(args)
-
-    # If users need to list plugins
-    if args.plugin_list:
-        list_plugins()
 
     if os.geteuid() == 0:
         start_root_daemon()
@@ -75,7 +71,7 @@ def main():
     if whitelist and blacklist:
         whitelist = None
 
-    if not args.target and not args.domain and not args.ip and not args.json and not args.extras and not args.daemon:
+    if not args.target and not args.domain and not args.ip and not args.json and not args.daemon:
         parser.print_help()
     elif args.daemon:
         diamond_shovel.slave.server.start_api_slave(args.daemon_url)
@@ -105,8 +101,12 @@ def init_parser_arguments(parser):
     parser.add_argument("--enable-plugin", type=str, default=None, help="启用插件", nargs="*")
     parser.add_argument("--disable-plugin", type=str, default=None, help="禁用插件", nargs="*")
 
-    parser.add_argument("-D", "--daemon", help="以Daemon模式运行", type=bool, default=False)
+    parser.add_argument("-D", "--daemon", help="以Daemon模式运行", action="store_true")
     parser.add_argument("-U", "--daemon-url", help="Daemon将会监听的URL", type=str, default="unix:///var/run/diamond_shovel.sock")
+    parser.add_argument("--daemon-config", help="Daemon将会使用的配置文件路径", type=pathlib.Path, default=pathlib.Path("/etc/diamond-shovel"))
+    parser.add_argument("--daemon-workdir", help="Daemon将会使用的工作目录", type=pathlib.Path, default=pathlib.Path("/var/lib/diamond-shovel"))
+
+    parser.set_defaults(daemon=False)
 
 
 def run_once(args, blacklist, whitelist):
