@@ -4,8 +4,12 @@ import urllib.parse
 import uvicorn
 from fastapi import FastAPI
 
+from diamond_shovel.slave.route import plugin, task
 
 app = FastAPI()
+
+app.include_router(plugin.router)
+app.include_router(task.router)
 
 def start_api_slave(url):
     parsed = urllib.parse.urlparse(url)
