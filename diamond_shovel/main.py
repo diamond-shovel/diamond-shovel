@@ -74,18 +74,9 @@ def main():
     if not args.target and not args.domain and not args.ip and not args.json and not args.daemon:
         parser.print_help()
     elif args.daemon:
-        diamond_shovel.slave.server.start_api_slave(args.daemon_url)
+        run_server(args)
     else:
         run_once(args, blacklist, whitelist)
-
-
-def list_plugins():
-    logging.info("Found plugin files: ")
-    print('-' * 20)
-    for plugin in iter_plugin_files():
-        logging.info(f"|--{plugin}")
-    print('-' * 20)
-    sys.exit(0)
 
 
 def init_parser_arguments(parser):
@@ -107,6 +98,20 @@ def init_parser_arguments(parser):
     parser.add_argument("--daemon-workdir", help="Daemon将会使用的工作目录", type=pathlib.Path, default=pathlib.Path("/var/lib/diamond-shovel"))
 
     parser.set_defaults(daemon=False)
+
+
+def run_server(args):
+    di["run_context"] = {
+        "root": args.daemon_workdir,
+        "daemon": True
+    }
+
+    from . import plugins
+    plugins.load_plugins(whitelist=[], blacklist=[])
+    from .plugins import events
+    events.call_event(events.DiamondShovelInitEvent(di["config"], False))
+
+    diamond_shovel.slave.server.start_api_slave(args.daemon_url)
 
 
 def run_once(args, blacklist, whitelist):

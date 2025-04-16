@@ -66,7 +66,10 @@ class PluginInitContext:
                 self.extract_resource("config.ini")
                 if self.__run_context__["daemon"]:
                     from ..privileged import invoke_method
-                    invoke_method(os, "rename", self.__data_folder__ / "config.ini", self.__config_file__)
+                    try:
+                        invoke_method(os, "rename", self.__data_folder__ / "config.ini", self.__config_file__)
+                    except RuntimeError: # we are not running as root
+                        os.rename(self.__data_folder__ / "config.ini", self.__config_file__)
         if self.__config_file__.exists():
             with open(self.__config_file__, "r") as f:
                 config.read_file(f)
