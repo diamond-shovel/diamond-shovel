@@ -1,10 +1,9 @@
 import multiprocessing
 import uuid
-from typing import Annotated
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, WebSocket
 from pydantic import BaseModel
-from websocket import WebSocket
 
 from diamond_shovel.function.task import WorkerPool, TaskContext
 from diamond_shovel.utils.func import async_helper
@@ -16,9 +15,9 @@ workers = WorkerPool()
 
 
 class TargetRequest(BaseModel):
-    companies: list[str] = []
-    domains: list[str] = []
-    ips: list[str] = []
+    companies: Optional[list[str]]
+    domains: Optional[list[str]]
+    ips: Optional[list[str]]
 
 @router.put('/')
 def new_task(target: Annotated[TargetRequest, Body(embed=True)]):
@@ -33,9 +32,9 @@ def new_task(target: Annotated[TargetRequest, Body(embed=True)]):
 
     ctx['scan_id'] = scan_id
 
-    ctx['target_companies'] = target.companies
-    ctx['target_domains'] = target.domains
-    ctx['target_ips'] = target.ips
+    ctx['target_companies'] = target.companies or []
+    ctx['target_domains'] = target.domains or []
+    ctx['target_ips'] = target.ips or []
 
     return {"scan_id": scan_id}
 

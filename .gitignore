@@ -28,3 +28,9 @@ resume.cfg
 mongo_data/
 /plugins/
 /libraries/
+diamond_shovel/version.py
+
+# built things
+build/
+diamond_shovel.egg-info/
+dist/

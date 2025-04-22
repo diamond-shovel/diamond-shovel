@@ -25,9 +25,14 @@ RUN echo "Asia/Shanghai" > /etc/timezone
 
 # 设置工作目录
 WORKDIR /data
+COPY . /data
 
-# 安装 python 依赖
-COPY requirements.txt /data/requirements.txt
-RUN pip3 install setuptools -i https://pypi.tuna.tsinghua.edu.cn/simple --break-system-packages
-RUN pip3 install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --break-system-packages
+RUN pip config set global.index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple && \
+    pip3 install build setuptools setuptools-scm --break-system-packages && \
+    python3 -m build -wn && \
+    pip3 install ./dist/*.whl --break-system-packages
 
+RUN diamond-shovel -I
+
+EXPOSE 8848
+ENTRYPOINT ["diamond-shovel", "-D", "-U", "http://0.0.0.0:8848/"]
