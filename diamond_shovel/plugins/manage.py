@@ -12,6 +12,12 @@ plugin_table: dict[str, dict] = {}
 
 @inject
 def load_plugins(data_path: pathlib.Path, whitelist: list[str] = None, blacklist: list[str] = None):
+    """
+    Load all plugins, from diamond shovel workdir
+    :params data_path: the diamond shovel workdir
+    :params whitelist: plugins to enable
+    :params blacklist: plugins to disable
+    """
     plugin_path = data_path / "plugins"
 
     if not plugin_path.exists():
@@ -24,7 +30,10 @@ def load_plugins(data_path: pathlib.Path, whitelist: list[str] = None, blacklist
             if file.suffix == ".ore":
                 raise ValueError("Paid plugin is not supported in Community Edition :(")
             if ".tar" in file.suffixes:
-                name, load_data = load_plugin_plain(file)
+                load_info = load_plugin_plain(file)
+                if load_info is None:
+                    continue
+                name, load_data = load_info
             if load_data:
                 plugin_table[name] = load_data
         except Exception:
@@ -34,6 +43,11 @@ def load_plugins(data_path: pathlib.Path, whitelist: list[str] = None, blacklist
 
 
 def enable_loaded_plugins(blacklist, whitelist):
+    """
+    Enable all loaded plugins
+    :params whitelist: plugins to enable
+    :params blacklist: plugins to disable
+    """
     load_order = []
     for plugin in generate_enable_order(plugin_table):
         skip_enable = False
@@ -59,6 +73,11 @@ def enable_loaded_plugins(blacklist, whitelist):
 
 
 def set_plugin_enabled(plugin_name: str, enabled: bool):
+    """
+    Sets the plugin enable state
+    :params plugin_name: target plugin name
+    :params enabled: whether enabled
+    """
     if plugin_name not in plugin_table:
         raise ValueError(f"Plugin {plugin_name} not found")
     if enabled == plugin_table[plugin_name].get("enabled", False):
@@ -83,4 +102,9 @@ def set_plugin_enabled(plugin_name: str, enabled: bool):
                     logging.error(f"Failed to disable plugin {plugin_name}: {traceback.format_exc()}")
 
 def is_plugin_enabled(plugin_name: str):
+    """
+    Checks if plugin is enabled
+    :params plugin_name: target plugin to check
+    :returns: True if enabled
+    """
     return plugin_table[plugin_name].get("enabled", False)

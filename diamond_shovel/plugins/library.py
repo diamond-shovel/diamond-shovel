@@ -20,6 +20,10 @@ from pip._internal.utils.temp_dir import TempDirectory
 
 
 def initalize_pip_options(options):
+    """
+    Internal function, initialize pip options
+    :params options: the options
+    """
     options.retries = 3
     options.no_input = True
     options.cache_dir = mkdtemp()
@@ -46,11 +50,19 @@ def initalize_pip_options(options):
 
 
 class PythonLibDownloader(RequirementCommand):
+    """
+    Downloading command that invokes pip to download libraries that required by plugin
+    """
     def __init__(self):
         super().__init__("shovel-download", "download plugin libraries")
 
     @inject
     def download(self, name, data_path: pathlib.Path):
+        """
+        Start downloading
+        :params name: library name
+        :params data_path: the root path of diamond shovel.
+        """
         options = Values()
 
         # No idea why these values are all must.
@@ -118,6 +130,11 @@ __check_passed__ = []
 
 @inject
 def fetch_python_library(name, data_path: pathlib.Path):
+    """
+    Find a library base on the name, will download one if not found
+    :params name: library name
+    :params data_path: root of diamond shovel workdir
+    """
     try:
         library_dir = data_path / "libraries"
         library_dir.mkdir(exist_ok=True)
@@ -143,6 +160,10 @@ def fetch_python_library(name, data_path: pathlib.Path):
 
 @inject
 def refresh_python_libraries(data_path: pathlib.Path):
+    """
+    Refreshes import caches of libraries
+    :params data_path: root of diamond shovel workdir
+    """
     library_dir = data_path / "libraries"
     library_dir.mkdir(exist_ok=True)
     sys.path.append(str(library_dir))
@@ -150,6 +171,11 @@ def refresh_python_libraries(data_path: pathlib.Path):
 
 
 def dispatch_python_wheel_decompress(file, target):
+    """
+    Dispatches decompression of a file, should be a python wheel
+    :params file: file to decompress
+    :params target: target folder to decompress to
+    """
     suffix = ''.join(file.suffixes)
     if suffix.endswith(".zip") or suffix.endswith(".whl"):
         with zipfile.ZipFile(file) as z:
@@ -163,6 +189,11 @@ def dispatch_python_wheel_decompress(file, target):
 
 
 def check_os_libraries(name: str):
+    """
+    Checks libraries that provided by OS
+    :params name: library name
+    :returns: a tuple of boolean and a message, True is passed
+    """
     os_id = fetch_os_id()
 
     check_cmd = None
@@ -186,6 +217,10 @@ def check_os_libraries(name: str):
     return True, "It's OK >w<"
 
 def fetch_os_id():
+    """
+    Reads OS id, only works on Linux
+    :returns: name of current OS
+    """
     os_property_file = pathlib.Path("/etc/os-release")
     if not os_property_file.exists():
         os_property_file = pathlib.Path("/usr/lib/os-release")

@@ -8,6 +8,9 @@ from kink import inject as inj
 # removing either of them could break the shovel down.
 # maybe the policy of python object reference is in our way.
 def inject(func):
+    """
+    Works as same with kink.di
+    """
     for f in inspect.stack():
         if "plugin_context" in f[0].f_locals:
             ctx = f[0].f_locals["plugin_context"]

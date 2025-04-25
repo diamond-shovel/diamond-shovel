@@ -36,6 +36,10 @@ class ShovelCoroutine:
 
     @property
     def waiting(self):
+        """
+        Checks if current worker coroutine is waiting
+        :returns: True if waiting
+        """
         return self._park_reason is not None
 
     @contextlib.contextmanager
@@ -51,6 +55,11 @@ class ShovelCoroutine:
             self._owner.restore_config()
 
     def as_task(self, on_complete, scheduler):
+        """
+        Starts the coroutine as an async task
+        :params on_complete: callback of completion
+        :params scheduler: the scheduler
+        """
         if self._task is None:
             logging.info(f"Starting {self._name}")
 
@@ -77,6 +86,10 @@ class ShovelCoroutine:
 
     @asynccontextmanager
     async def park(self, reason):
+        """
+        Engage a waiting situation
+        :params reason: reason of waiting
+        """
         if self._park_reason is not None:
             raise RuntimeError(f"{self._name} is already parked")
         self._park_reason = reason
@@ -87,11 +100,17 @@ class ShovelCoroutine:
             self._park_reason = None
 
     async def wake_watchdog(self):
+        """
+        Wakes up the watchdog thread, interrupt the waiting chain
+        """
         for scheduler in self._running_schedulers:
             await scheduler.alarm_watchdog()
 
     @asynccontextmanager
     async def unpark(self):
+        """
+        Temporary leaves the waiting mode, usually for doing scheduler related things
+        """
         if self._park_reason is None:
             raise RuntimeError(f"{self._name} is not parked")
         original_reason = self._park_reason
@@ -109,17 +128,29 @@ class ShovelCoroutine:
 
     @property
     def running(self):
+        """
+        Checks if current coroutine is running
+        :returns: True if still running
+        """
         if self._task is None:
             return False
         return (not self._task.done()) and (not self._task.cancelled())
 
     @property
     def done(self):
+        """
+        Checks if current coroutine is finished
+        :returns: True if finished
+        """
         if self._task is None:
             return False
         return self._task.done()
 
     async def get_result(self):
+        """
+        Reads result of current coroutine
+        :returns: the result
+        """
         if self._result is None:
             self._result = asyncio.get_running_loop().create_future()
 
@@ -130,6 +161,9 @@ coroutine_wrapper_mapping: [typing.Coroutine, ShovelCoroutine] = {}
 
 
 async def dummy(_):
+    """
+    A dummy coroutine that doing nothing
+    """
     pass
 
 
@@ -138,6 +172,10 @@ dummy_task_group = TaskGroup()
 
 
 def current_coroutine(loop=None) -> ShovelCoroutine:
+    """
+    Gets current coroutine
+    :returns: current coroutine
+    """
     return coroutine_wrapper_mapping.get(asyncio.current_task(loop), dummy_coroutine)
 
 
@@ -150,10 +188,19 @@ class CoroutineQueue:
         self._task_to_interrupt = []
 
     def put(self, item: ShovelCoroutine, nice=0):
+        """
+        Put a coroutine to queue
+        :params item: the coroutine
+        :params nice: the nice value
+        """
         self._queue_.put_nowait((nice, item))
         self._name_map_[item._name] = item
 
     async def run(self):
+        """
+        Launches all queued coroutine, and waits for the result
+        :returns: all result of coroutines
+        """
         task_set = []
 
         def complete(_):
@@ -176,9 +223,16 @@ class CoroutineQueue:
         return {item._name: await collect(item) for item in self._name_map_.values()}
 
     async def alarm_watchdog(self):
+        """
+        Wakes the watchdog, to check if there's anyone to interrupt
+        """
         self._watchdog_alarm.set()
 
     async def check_interrupt(self, task_set):
+        """
+        The loop of interrupting, checks everyone that not done
+        :params task_set: the task list
+        """
         while any([not task.done() for task in task_set]):
             await asyncio.sleep(1)
             if self._task_to_interrupt:
@@ -189,6 +243,11 @@ class CoroutineQueue:
                 self._task_to_interrupt.clear()
 
     def set_nice(self, name, nice):
+        """
+        Sets the nice value of specified coroutine
+        :params name: target coroutine
+        :params nice: new nice value
+        """
         item = self._name_map_[name]
         for qitem in self._queue_.queue:
             if qitem[1] == item:
@@ -198,6 +257,11 @@ class CoroutineQueue:
         self.put(item, nice)
 
     def watchdog(self, task_set, loop):
+        """
+        The watchdog method, that wakes waiting task from waiting infinitely
+        :params task_set: async tasks to minitor
+        :params loop: current async eventloop
+        """
         logging.debug("Watchdog started.")
         while any([not task.done() for task in task_set]):
             try:
@@ -206,25 +270,7 @@ class CoroutineQueue:
             except:
                 pass
 
-            logging.debug("Dumping all tasks")
-            for task in task_set:
-                logging.debug(f"{coroutine_wrapper_mapping[task]._name}: {coroutine_wrapper_mapping[task]}")
-                ctx = coroutine_wrapper_mapping[task].ctx
-            logging.debug("-" * 50)
-            remaining = async_helper.run_async(ctx.get_remaining_workers(ignore_self=True))
-            logging.debug(f"Running tasks ({len(remaining)} remains)")
-            logging.debug("-" * 50)
-            [logging.debug(f"{name}: {self._name_map_[name]}") for name in remaining]
-            logging.debug("-" * 50)
-            curr = asyncio.current_task(loop)
-
-            if curr is None:
-                logging.debug(f"Nothing is running now.")
-            else:
-                logging.debug(f"Current task: {str(curr)}")
-                logging.debug("-" * 50)
-                stack = curr.get_stack()
-                [logging.debug(f"{frame}") for frame in stack]
+            self.debug_dump_tasks(loop, task_set)
 
             if not all([coroutine_wrapper_mapping[task].waiting for task in task_set if not task.done()]):
                 continue
@@ -235,7 +281,37 @@ class CoroutineQueue:
                 self._task_to_interrupt.append(item)
                 break
 
+    def debug_dump_tasks(self, loop, task_set):
+        """
+        Dump all the tasks, to check who is the source of deadlock
+        :params loop: current async eventloop
+        :params task_set: tasks to monitor
+        """
+        logging.debug("Dumping all tasks")
+        for task in task_set:
+            logging.debug(f"{coroutine_wrapper_mapping[task]._name}: {coroutine_wrapper_mapping[task]}")
+            ctx = coroutine_wrapper_mapping[task].ctx
+        logging.debug("-" * 50)
+        remaining = async_helper.run_async(ctx.get_remaining_workers(ignore_self=True))
+        logging.debug(f"Running tasks ({len(remaining)} remains)")
+        logging.debug("-" * 50)
+        [logging.debug(f"{name}: {self._name_map_[name]}") for name in remaining]
+        logging.debug("-" * 50)
+        curr = asyncio.current_task(loop)
+        if curr is None:
+            logging.debug(f"Nothing is running now.")
+        else:
+            logging.debug(f"Current task: {str(curr)}")
+            logging.debug("-" * 50)
+            stack = curr.get_stack()
+            [logging.debug(f"{frame}") for frame in stack]
+
     def get_nice(self, name):
+        """
+        Gets nice value of a coroutine
+        :params name: target coroutine
+        :returns: the nice value, None if not found
+        """
         item = self._name_map_[name]
         for qitem in self._queue_.queue:
             if qitem[1] == item:
@@ -243,6 +319,10 @@ class CoroutineQueue:
         return None
 
     def remove(self, name):
+        """
+        Removes a coroutine from queue
+        :params name: target coroutine
+        """
         item = self._name_map_[name]
         if item is None:
             raise ValueError("item not found")
@@ -254,12 +334,24 @@ class CoroutineQueue:
         raise ValueError("item not found")
 
     def size(self):
+        """
+        Gets the queue size
+        :returns: the queue size
+        """
         return self._queue_.qsize()
 
     def items(self):
+        """
+        Gets everything from the queue
+        :returns: the list tuples of name, coroutine
+        """
         return self._name_map_.items()
 
     def values(self):
+        """
+        Gets every coroutine from the queue
+        :returns: the coroutine list
+        """
         return self._name_map_.values()
 
     def __getitem__(self, item):

@@ -50,6 +50,10 @@ class TaskContext:
         self.__log__ = []
 
     def start(self, workers):
+        """
+        Bootstraps task context with workers
+        :params workers: workers to bootstrap with
+        """
         if self.__worker_tasks__ is not None:
             raise Exception("Task already started.")
         self.__worker_tasks__ = workers
@@ -58,6 +62,11 @@ class TaskContext:
         return self.__futures__.keys()
 
     async def get(self, name: str):
+        """
+        Fetches value in a context
+        Fires a `TaskReadTriggerEvent` and the result can be altered.
+        :params name: key name
+        """
         if name not in self.__futures__ or (self.__futures__[name].done() and await self.__futures__[name] is None):
             logging.debug(f"Reset {name} for {current_task(asyncio.get_running_loop())}")
             loop = asyncio.get_running_loop()
@@ -75,6 +84,12 @@ class TaskContext:
         return evt.value
 
     async def set(self, name: str, result: Any):
+        """
+        Sets value in a context
+        Fires a `TaskWriteTriggerEvent` and the result can be altered
+        :params name: key name
+        :params result: the value to be set
+        """
         loop = asyncio.get_running_loop()
 
         old_value = None
@@ -99,6 +114,10 @@ class TaskContext:
         call_async(self.set, key, value)
 
     def items(self):
+        """
+        Fetches a copy of context values
+        :returns: a list of tuples that formatted with key and value.
+        """
         return [(key, values) for key, values in self.__futures__.items() if values.done()]
 
     def __iter__(self):
@@ -110,11 +129,31 @@ class TaskContext:
                 self.__futures__[item].result() is not None)
 
     async def operate(self, key, func, *args, **kwargs):
+        """
+        Perform operations on the value, and set the new result back to context.
+        Events will be fired at following order:
+          - TaskReadTriggerEvent
+          - *callback function*
+          - TaskWriteTriggerEvent
+          - TaskReadTriggerEvent
+        :params key: context key to operate
+        :params func: callback function to map the original value to a new value
+        :params args: positional arguments to callback function
+        :params kwargs: keyword arguments to callback function
+        :returns: transformed context value, usually the return value of `func` parameter
+        """
         tmp = await self.get(key)
         await self.set(key, func(tmp, *args, **kwargs))
         return await self.get(key)
 
     async def get_worker_result(self, plugin_name, worker_name):
+        """
+        Reads result of workers
+        Result of workers isn't stored like how a key-value context did, they've been isolated to avoid accidental modification
+        :params plugin_name: source plugin
+        :params worker_name: source worker
+        :returns: None if source plugin isn't found, otherwise we'll try to fetch the result, and wait when the target is not done
+        """
         if plugin_name not in diamond_shovel.plugins.manage.plugin_table:
             return None
 
@@ -131,13 +170,29 @@ class TaskContext:
         return None
 
     async def get_all_results(self):
+        """
+        Triggers the worker execution and gets all the results from workers
+        Should not be called from a plugin, it will be called internally
+        :returns: all results
+        """
         return await self.__worker_tasks__.run()
 
     async def get_remaining_workers(self, ignore_self=False):
+        """
+        Fetches workers that haven't done their jobs, usually used internally for worker communication
+        :params ignore_self: whether to ignore the caller worker.
+        :returns: all the workers that haven't done their jobs
+        """
         return [name for name, worker in self.__worker_tasks__.items() if
                 worker.running and (not ignore_self or worker != scheduler.current_coroutine())]
 
     async def collect(self, key, size=10):
+        """
+        Collects everything from a list value, and tries to wait for more result
+        Yields results are collected in chunks, which is also a list that contains the result
+        :params key: the key to collect
+        :params size: the size of yielded chunks
+        """
         results = []
         selected = []
         retry_times = 0
@@ -201,15 +256,27 @@ class TaskContext:
         return f"TaskContext(futures={{{self.__futures__}}}, finished_plugins={{{self.__finished_plugins__}}})"
 
     def get_plugin_config(self, plugin_name):
+        """
+        Reads config of a plugin, espically set for current task
+        :params plugin_name: name of plugin
+        """
         if plugin_name not in self.__plugin_config__:
             self.__plugin_config__[plugin_name] = {}
 
         return self.__plugin_config__[plugin_name]
 
     def log(self, msg):
+        """
+        Logs a message to current context
+        :params msg: log message
+        """
         self.__log__.append(msg)
 
     def get_log(self):
+        """
+        Reads all the log in current context
+        :returns: the log
+        """
         return self.__log__
 
 
@@ -232,11 +299,21 @@ class WorkerPool:
 
     def register_worker(self, plugin_ctx: PluginInitContext, worker: Callable[[TaskContext], Coroutine[Any, Any, Any]],
                         nice=0):
+        """
+        Registers a worker to worker pool
+        :params plugin_ctx: which plugin
+        :params worker: which worker
+        :params nice: the nice value, affects how things will be scheduled
+        """
         if plugin_ctx not in self.__workers__:
             self.__workers__[plugin_ctx] = []
         self.__workers__[plugin_ctx].append((worker, nice))
 
     def get_docs(self):
+        """
+        Fetch all documents from plugin
+        :returns: a tuple with plugin name, worker name and document
+        """
         def extract_doc(plugin, name):
             try:
                 with plugin.open_resource(name + ".txt") as f:
@@ -252,6 +329,13 @@ class WorkerPool:
 
     async def run_worker(self, ctx_target_companies: TaskContext | list[str], target_domains: list[str] = None,
                          target_ips: list[str] = None, loguru_handler: Callable[[str], None] | None = None):
+        """
+        Fire a task execution to target
+        :params ctx_target_companies: context or target companies
+        :params target_domains: target domains
+        :params target_ips: target ips
+        :params loguru_handler: handler of logging, will be called on every log
+        """
         ctx = ctx_target_companies \
             if isinstance(ctx_target_companies, TaskContext) \
             else await initialize_task_context(ctx_target_companies, target_domains, target_ips)
@@ -289,6 +373,12 @@ worker_pool = WorkerPool()
 
 
 async def initialize_task_context(target_companies=None, target_domains=None, target_ips=None):
+    """
+    Create a task context from following target information
+    :params target_companies: target companies
+    :params target_domains: target domains
+    :params target_ips: target ips
+    """
     if target_ips is None:
         target_ips = []
     if target_companies is None:
@@ -304,6 +394,12 @@ async def initialize_task_context(target_companies=None, target_domains=None, ta
 
 
 async def run_full_scan(target_companies=None, target_domains=None, target_ips=None):
+    """
+    Runs a full scan on target
+    :params target_companies: target companies
+    :params target_domains: target domains
+    :params target_ips: target ips
+    """
     if target_domains is None:
         target_domains = []
     if target_ips is None:
@@ -320,4 +416,7 @@ async def run_full_scan(target_companies=None, target_domains=None, target_ips=N
 
 
 def init():
+    """
+    Initializes the worker, and fires a initialize event
+    """
     events.call_event(events.WorkerPoolInitEvent(worker_pool))

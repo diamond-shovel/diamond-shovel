@@ -28,6 +28,9 @@ from diamond_shovel.utils.func import async_helper
 
 
 class PluginInitContext:
+    """
+    The context that describes a plugin, usually for initialization
+    """
     @inject
     def __init__(self, plugin_name, archive: tarfile.TarFile, run_context: dict[str, typing.Any],
                  data_path: pathlib.Path):
@@ -50,6 +53,9 @@ class PluginInitContext:
         self.__threaded_attached_modified_container__ = {}
 
     def setup_base_container(self):
+        """
+        Initializes the dependency container of current plugin
+        """
         self.__plugin_dependency_container__[BinaryManager] = di[BinaryManager]
         self.__plugin_dependency_container__[ConfigParser] = self.config
         self.__plugin_dependency_container__["data_folder"] = self.data_folder
@@ -58,6 +64,9 @@ class PluginInitContext:
 
     @property
     def config(self) -> configparser.ConfigParser:
+        """
+        Fetches the config of current plugin
+        """
         config = configparser.ConfigParser(interpolation=configparser.Interpolation())
 
         if not self.__config_file__.exists():
@@ -85,23 +94,39 @@ class PluginInitContext:
         return config
 
     def override_config(self, config):
+        """
+        Overrides default config with provided config
+        :params config: config to override
+        """
         logging.debug(f"{self.plugin_name}'s config overridden by {config}")
         self.__config_overrider__.append(config)
         self.__plugin_dependency_container__[ConfigParser] = self.config # we need a refresh.
         logging.debug(f"Current config: { {section: {key: value for key, value in self.config.items(section)} for section in self.config.sections()} }")
 
     def restore_config(self):
+        """
+        Restore all config to default
+        """
         self.__config_overrider__ = self.__config_overrider__[:-1]
         self.__plugin_dependency_container__[ConfigParser] = self.config
 
     @property
     def data_folder(self) -> pathlib.Path:
+        """
+        Gets data folder
+        :returns: the path to data folder
+        """
         if not self.__data_folder__.exists():
             self.__data_folder__.mkdir(parents=True)
         return self.__data_folder__
 
     @contextmanager
     def open_resource(self, name: str) -> typing.Generator[io.IOBase, None, None]:
+        """
+        Reads resource from plugin archive
+        :params name: resource name
+        :returns: stream of resource
+        """
         f = None
         try:
             f = self.__archive__.extractfile(name)
@@ -111,6 +136,11 @@ class PluginInitContext:
                 f.close()
 
     def extract_resource(self, name: str, replace: bool = False):
+        """
+        Extracts a resource from plugin archive to file with same name, under the data folder
+        :params name: resource name
+        :params replace: whether to replace original resource
+        """
         if not replace and (self.data_folder / name).exists():
             return
 
@@ -122,6 +152,10 @@ class PluginInitContext:
         logging.debug("Existence check: %s", (self.data_folder / name).exists())
 
     def fetch_current_container(self, extras={}):
+        """
+        Gets the current dependency container on cureent thread or eventloop, for dependency injection
+        :returns: current dependency container
+        """
         if async_helper.is_current_async():
             current_thread = asyncio.get_running_loop()
             container = self.__threaded_attached_modified_container__.get(current_thread)
@@ -145,6 +179,9 @@ class PluginInitContext:
     # see its document.
     @contextmanager
     def attach(self, extras={}):
+        """
+        Attach to current container
+        """
         old_di = kink.di
         setattr(kink, "di", self.fetch_current_container(extras))
 
@@ -155,6 +192,9 @@ class PluginInitContext:
 
 
 class PluginModuleLoader(importlib.abc.Loader):
+    """
+    Internal loader of plugins
+    """
     def __init__(self, tar_file: tarfile.TarFile, plugin_name: str, plugin_ctx: PluginInitContext):
         self.__tar_file__ = tar_file
         self.__plugin_name__ = plugin_name
@@ -210,9 +250,17 @@ class PluginModuleLoader(importlib.abc.Loader):
 
     @property
     def plugin_name(self):
+        """
+        Gets current plugin name
+        :returns: current plugin name
+        """
         return self.__plugin_name__
 
     def is_module_package(self, fullname):
+        """
+        Checks if target is a python package
+        :returns: True if target is a python package
+        """
         mod = self.find_module(fullname + ".__init__")
         return mod is not None
 
@@ -242,6 +290,10 @@ class PluginModuleFinder(importlib.abc.MetaPathFinder):
 
 
 def load_plugin_tar(tar: tarfile.TarFile):
+    """
+    Load a plugin from tar file
+    :params tar: target tar file
+    """
     if "plugin.ini" not in tar.getnames():
         return
 
@@ -256,6 +308,16 @@ def load_plugin_tar(tar: tarfile.TarFile):
 
 
 def make_plugin(config, dependencies, entrypoint, help, name, tar, version):
+    """
+    Initializes a plugin context from provided information
+    :params config: plugin metadata
+    :params dependencies: plugin dependencies
+    :params entrypoint: plugin entrypoint
+    :params help: help information
+    :params name: plugin name
+    :params tar: plugin tar
+    :params version: plugin version
+    """
     ctx = PluginInitContext(name, tar)
     sys.meta_path.append(PluginModuleFinder(PluginModuleLoader(tar, name, ctx)))
     importlib.invalidate_caches()
@@ -272,6 +334,10 @@ def make_plugin(config, dependencies, entrypoint, help, name, tar, version):
 
 
 def check_plugin_os_dependencies(config):
+    """
+    Checks the system dependencies of plugin
+    :params config: plugin metadata
+    """
     os_dependencies = config["plugin"].get("os_dependencies")
     if os_dependencies:
         parser = csv.reader([os_dependencies])
@@ -282,6 +348,10 @@ def check_plugin_os_dependencies(config):
 
 
 def check_plugin_python_dependencies(config):
+    """
+    Checks and fetches dependencies of plugin
+    :params config: plugin metadata
+    """
     python_dependencies = config["plugin"].get("package_dependencies")
     if python_dependencies:
         parser = csv.reader([python_dependencies])
@@ -290,6 +360,11 @@ def check_plugin_python_dependencies(config):
 
 
 def read_plugin_metadata(reader, tar):
+    """
+    Extract information from plugin metadata
+    :params reader: reader to metadata file
+    :params tar: the plugin tar
+    """
     config = configparser.ConfigParser()
     config.read_string(reader.read().decode())
     name = config["plugin"]["name"]
@@ -312,10 +387,20 @@ def read_plugin_metadata(reader, tar):
 
 
 def load_plugin_plain(file: pathlib.Path):
+    """
+    Load a plain plugin, from plugin tar
+    :params file: the plugin file to load
+    :returns: the loaded plugin
+    """
     return load_plugin_tar(tarfile.open(file, "r:*"))
 
 
 def generate_enable_order(plugin_table):
+    """
+    Generates enable order, tries to avoid dependency problems
+    :params plugin_table: the plugin table
+    :returns: the order of plugin enabling
+    """
     plugin_dict_clone = plugin_table.copy()
 
     def visit(plugin_name, dependency_stack):

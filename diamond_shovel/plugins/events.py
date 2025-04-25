@@ -66,6 +66,9 @@ class TaskEvent(Event):
 
 
 class TaskDispatchEvent(TaskEvent):
+    """
+    Task dispatching event, fired when the task is dispatched to workers
+    """
     def __init__(self, task_context):
         """
         :param TaskContext task_context: 任务上下文
@@ -74,6 +77,9 @@ class TaskDispatchEvent(TaskEvent):
 
 
 class TaskReadTriggerEvent(TaskEvent):
+    """
+    Task reading event, fired when someone trying to read something from the task
+    """
     def __init__(self, task_context, key, value):
         super().__init__(task_context)
         self.key = key
@@ -81,6 +87,9 @@ class TaskReadTriggerEvent(TaskEvent):
 
 
 class TaskWriteTriggerEvent(TaskEvent):
+    """
+    Task writing event, fired when someone trying to write something to the task
+    """
     def __init__(self, task_context, key, value, old_value):
         super().__init__(task_context)
         self.key = key
@@ -106,6 +115,10 @@ def register_event(init_ctx, evt_class, handler):
 
 @async_helper.disallows_direct_async
 def call_event(evt):
+    """
+    invokes all event handlers that is related to the event
+    :params evt: the event
+    """
     if not isinstance(evt, Event):
         raise TypeError("evt must be an instance of Event")
     if evt.__class__ not in __event_handlers__:
