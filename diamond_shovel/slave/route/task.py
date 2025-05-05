@@ -66,6 +66,14 @@ def update_task_args(params: dict, scan_id: uuid.UUID):
     for key, value in params.items():
         scan_session[scan_id]["ctx"][key] = value
 
+@router.post('/{scan_id}/plugins')
+def update_task_plugin_config(params: dict, scan_id: uuid.UUID):
+    if scan_id not in scan_session:
+        return {"error": "Scan not found"}
+
+    for plugin_name, plugin_config in params.items():
+        scan_session[scan_id]["ctx"].set_plugin_config(plugin_name, plugin_config)
+
 @router.get('/{scan_id}/start')
 def start_task(scan_id: uuid.UUID):
     if scan_id not in scan_session:
