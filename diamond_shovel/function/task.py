@@ -206,6 +206,12 @@ class TaskContext:
 
         return self.__plugin_config__[plugin_name]
 
+    def set_plugin_config(self, plugin_name, config):
+        if plugin_name not in self.__plugin_config__:
+            self.__plugin_config__[plugin_name] = {}
+
+        self.__plugin_config__[plugin_name].update(config)
+
     def log(self, msg):
         self.__log__.append(msg)
 
