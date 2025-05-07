@@ -46,4 +46,4 @@ trigger:
   stage: trigger
   trigger:
     project: aszl/diamond-shovel/shovel-workbench
-    branch: change-curl-to-trigger
+    branch: dev
