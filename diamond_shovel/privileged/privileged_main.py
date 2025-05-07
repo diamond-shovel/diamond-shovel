@@ -10,6 +10,9 @@ key = None
 parent_pipe: multiprocessing.connection.Connection = None
 
 def run(queue, child_pipe: multiprocessing.connection.Connection):
+    """
+    Root daemon method, provides service to access root
+    """
     if os.geteuid() != 0:
         raise PermissionError("Privilege mode must be run as root")
     while True:
@@ -37,27 +40,48 @@ def run(queue, child_pipe: multiprocessing.connection.Connection):
             traceback.print_exc()
 
 def ensure_privileged():
+    """
+    Makes sure privileged daemon is enabled
+    """
     if not privileged_queue or not parent_pipe:
         raise RuntimeError("Privileged queue not set")
 
 def request_execution(python_bytecode: bytes, function_name: str):
+    """
+    Requests a python execution on root user
+    :params python_bytecode: python bytecode to execute
+    :params function_name: function to call
+    """
     ensure_privileged()
     hash_key = hashlib.sha256(dill.dumps(("eval_code", key, python_bytecode, function_name)))
     privileged_queue.put(("eval_code", hash_key, python_bytecode, function_name))
     return parent_pipe.recv()
 
 def load_privileged_plugin(plugin_path: str):
+    """
+    Requests a plugin loading on root user
+    :params plugin_path: path to target plugin
+    """
     ensure_privileged()
     hash_key = hashlib.sha256(dill.dumps(("load_plugin", key, plugin_path)))
     privileged_queue.put(("load_plugin", hash_key, plugin_path))
 
 def invoke_method(invoke_obj, method_name: str, *args):
+    """
+    Requests a python method invocation on target object
+    :params invoke_obj: the object to invoke on, None is a static invocation
+    :params method_name: the method to be invoked
+    :params args: method arguments
+    """
     ensure_privileged()
     hash_key = hashlib.sha256(dill.dumps(("invoke_method", key, dill.dumps(invoke_obj) if invoke_obj else None, method_name, dill.dumps(args))))
     privileged_queue.put(("invoke_method", hash_key, dill.dumps(invoke_obj) if invoke_obj else None, method_name, dill.dumps(args)))
     return parent_pipe.recv()
 
 def terminate():
+    """
+    Terminate the root daemon
+    """
     if not privileged_queue:
         return
     hash_key = hashlib.sha256(dill.dumps(("terminate", key)))
