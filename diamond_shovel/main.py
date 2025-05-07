@@ -1,6 +1,5 @@
 import argparse
 import asyncio
-import base64
 import json
 import logging
 import multiprocessing
@@ -140,14 +139,6 @@ def run_once(args, blacklist, whitelist):
     task.init()
     ctx = task.TaskContext()
 
-    if args.extras:
-        extras = json.loads(base64.b64decode(args.extras).decode('utf-8'))
-    else:
-        extras = {}
-
-    for key, value in extras.items():
-        ctx[key] = value
-
     def merge_list(ctx, key, value):
         if key in ctx:
             tmp = ctx[key]
@@ -159,24 +150,6 @@ def run_once(args, blacklist, whitelist):
     merge_list(ctx, "target_companies", target_companies)
     merge_list(ctx, "target_domains", target_domains)
     merge_list(ctx, "target_ips", target_ips)
-    if args.config:
-        config = json.loads(base64.b64decode(args.config).decode('utf-8'))
-    else:
-        config = {}
-
-    logging.debug(f"Starting with config: {config}")
-
-    for plugin_name, plugin_config in config.items():
-        cfg = ctx.get_plugin_config(plugin_name)
-        for section, values in plugin_config.items():
-            if section not in cfg:
-                cfg[section] = {}
-            for key, value in values.items():
-                if value is None or len(str(value)) == 0:
-                    continue
-
-                if key not in cfg[section]:
-                    cfg[section][key] = str(value)
 
     with open(args.out_json, "w") as f:
         scan_result = asyncio.run(task.run_full_scan(ctx))

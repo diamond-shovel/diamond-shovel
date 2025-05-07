@@ -87,9 +87,9 @@ def start_task(scan_id: uuid.UUID):
     async def task_runner():
         await workers.run_worker(scan_session[scan_id]["ctx"], loguru_handler=log_hook)
         scan_session[scan_id]["state"] = "finished"
+    scan_session[scan_id]["state"] = "running"
     loop = async_helper.threaded_async_run(task_runner())
     scan_session[scan_id]["loop"] = loop
-    scan_session[scan_id]["state"] = "running"
 
 @router.websocket('/ws/{scan_id}')
 def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
