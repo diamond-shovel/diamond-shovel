@@ -1,7 +1,8 @@
 stages:
   - build
   - build-docker
-  - webhook
+  - branch
+  - trigger
 
 build:
   stage: build
@@ -33,11 +34,16 @@ build-docker:
   script:
     - docker build -t gitlab.cyberspike.top:5050/aszl/diamond-shovel/diamond-shovel:$(echo -n "$CI_COMMIT_REF_NAME" |  sed 's/[^a-zA-Z0-9._-]/_/g') .
     - docker push gitlab.cyberspike.top:5050/aszl/diamond-shovel/diamond-shovel:$(echo -n "$CI_COMMIT_REF_NAME" |  sed 's/[^a-zA-Z0-9._-]/_/g')
-webhook:
-  stage: webhook
+branch:
+  stage: branch
   image: gitlab.cyberspike.top:5050/docker/alpine/curl:8.9.1
   script:  |
     curl -X POST -H "Content-Type: application/json" -d '{"project_name": "diamond-shovel", "branch_name": "'$(echo -n "$CI_COMMIT_REF_NAME" |  sed 's/[^a-zA-Z0-9._-]/_/g')'"}' http://workbench.dev.cyberspike.top:2333/update_branch
-    curl -X POST --fail -F token=$CI_JOB_TOKEN -F ref=dev https://gitlab.cyberspike.top/api/v4/projects/65/trigger/pipeline
   tags:
     - docker
+
+trigger:
+  stage: trigger
+  trigger:
+    project: aszl/diamond-shovel/shovel-workbench
+    branch: change-curl-to-trigger
