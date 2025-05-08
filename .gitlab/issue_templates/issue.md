@@ -15,12 +15,12 @@
 ## 复现指引
 ### 步骤说明(请清洗描述并包含截图)
 #### 操作步骤
-- use hyphen as a list
-- show us steps that
-- reproduces the problem
+- 使用连字符作为列表
+- 向我们展示步骤
+- 以重现问题
 #### 包含输入参数/测试数据
 ```text
-zh
+
 ```
 
 #### 触发问题的关键操作
@@ -40,10 +40,9 @@ zh
 
 ## 解决方案建议(Optional)
 ### 已尝试的修复方法
-- every step
-- that you have tried
-- as a workaround
-- but didn't fix
+- 你所尝试的
+- 没起作用的
+- 每一步解决方法
 
 ## 补充材料(Optional)
 - [ ] 签署贡献协议（如需要）
