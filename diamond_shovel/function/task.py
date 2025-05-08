@@ -173,8 +173,11 @@ class TaskContext:
         """
         Triggers the worker execution and gets all the results from workers
         Should not be called from a plugin, it will be called internally
-        :returns: all results
+        :returns: all results, but None if not even started
         """
+        if self.__worker_tasks__ is None:
+            return None
+
         return await self.__worker_tasks__.run()
 
     async def get_remaining_workers(self, ignore_self=False):
@@ -288,6 +291,7 @@ class TaskContext:
 
 class ThreadLoguruHook(logging.Handler):
     def __init__(self, target_thread, cb):
+        super().__init__()
         self._target_thread = target_thread
         self._cb = cb
 
@@ -350,6 +354,7 @@ class WorkerPool:
             loguru_handler_id = None
             if loguru_handler is not None:
                 current_thread = threading.current_thread()
+
                 loguru_handler_id = loguru.logger.add(sink=ThreadLoguruHook(current_thread, loguru_handler))
 
             try:
