@@ -1,4 +1,4 @@
-FROM gitlab.cyberspike.top:5050/docker/python:3.12
+FROM gitlab.cyberspike.top:5050/docker/python:3.13
 RUN sed -i 's|http://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; s|http://deb.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g' /etc/apt/sources.list.d/debian.sources
 RUN apt update && apt install -y \
     curl \
@@ -30,7 +30,8 @@ COPY . /data
 RUN pip config set global.index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple && \
     pip3 install build setuptools setuptools-scm --break-system-packages && \
     python3 -m build -wn && \
-    pip3 install ./dist/*.whl --break-system-packages
+    pip3 install ./dist/*.whl --break-system-packages && \
+    pip3 install pydevd-pycharm~=251.23774.444 --break-system-packages
 
 RUN diamond-shovel -I
 
