@@ -1,8 +1,10 @@
-import multiprocessing
+import asyncio
+import logging
+import traceback
 import uuid
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Body, WebSocket
+from fastapi import APIRouter, Body, WebSocket, HTTPException
 from pydantic import BaseModel
 
 from diamond_shovel.function.task import WorkerPool, TaskContext
@@ -27,7 +29,7 @@ def new_task(target: Annotated[TargetRequest, Body(embed=True)]):
     scan_session[scan_id] = {
         "ctx": ctx,
         "state": "created",
-        "log_condition": multiprocessing.Condition()
+        "log_lines": asyncio.Queue(),
     }
 
     ctx['scan_id'] = scan_id
@@ -41,12 +43,12 @@ def new_task(target: Annotated[TargetRequest, Body(embed=True)]):
 @router.get('/{scan_id}')
 async def get_task(scan_id: uuid.UUID):
     if scan_id not in scan_session:
-        return {"error": "Scan not found"}
+        raise HTTPException(404, "Scan session not found")
 
     return {
         "state": scan_session[scan_id]["state"],
         "result": await scan_session[scan_id]["ctx"].get_all_results(),
-        "log": await scan_session[scan_id]["ctx"].get_log()
+        "log": scan_session[scan_id]["ctx"].get_log()
     }
 
 @router.delete('/{scan_id}')
@@ -60,7 +62,7 @@ def delete_task(scan_id: uuid.UUID):
 @router.post('/{scan_id}')
 def update_task_args(params: dict, scan_id: uuid.UUID):
     if scan_id not in scan_session:
-        return {"error": "Scan not found"}
+        raise HTTPException(404, "Scan session not found")
 
     for key, value in params.items():
         scan_session[scan_id]["ctx"][key] = value
@@ -68,7 +70,7 @@ def update_task_args(params: dict, scan_id: uuid.UUID):
 @router.post('/{scan_id}/plugins')
 def update_task_plugin_config(params: dict, scan_id: uuid.UUID):
     if scan_id not in scan_session:
-        return {"error": "Scan not found"}
+        raise HTTPException(404, "Scan session not found")
 
     for plugin_name, plugin_config in params.items():
         scan_session[scan_id]["ctx"].set_plugin_config(plugin_name, plugin_config)
@@ -76,31 +78,40 @@ def update_task_plugin_config(params: dict, scan_id: uuid.UUID):
 @router.get('/{scan_id}/start')
 def start_task(scan_id: uuid.UUID):
     if scan_id not in scan_session:
-        return {"error": "Scan session not found"}
+        raise HTTPException(404, "Scan session not found")
 
     def log_hook(log):
-        scan_session[scan_id]["last_line"] = log
-        scan_session[scan_id]["log_condition"].acquire()
-        scan_session[scan_id]["log_condition"].notify()
-        scan_session[scan_id]["log_condition"].release()
+        scan_session[scan_id]["log_lines"].put_nowait(log)
 
     async def task_runner():
-        await workers.run_worker(scan_session[scan_id]["ctx"], loguru_handler=log_hook)
-        scan_session[scan_id]["state"] = "finished"
+        try:
+            await workers.run_worker(scan_session[scan_id]["ctx"], loguru_handler=log_hook)
+            scan_session[scan_id]["state"] = "finished"
+            scan_session[scan_id]['log_lines'].shutdown(immediate=True)
+        except:
+            logging.error(f"Error while processing task {scan_id}: {traceback.format_exc()}")
+
     scan_session[scan_id]["state"] = "running"
     loop = async_helper.threaded_async_run(task_runner())
     scan_session[scan_id]["loop"] = loop
 
 @router.websocket('/ws/{scan_id}')
-def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
-    while scan_session[scan_id]["state"] == "running":
-        scan_session[scan_id]["log_condition"].acquire()
-        scan_session[scan_id]["log_condition"].wait()
-        scan_session[scan_id]["log_condition"].release()
+async def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
+    if scan_id not in scan_session:
+        raise HTTPException(404, "Scan session not found")
 
-        websocket.send_text(f'{{"action":"log", "body":"{scan_session[scan_id]["last_line"]}"}}')
-    websocket.send_text('{"action":"finished"}')
-    websocket.close()
+    await websocket.accept()
+
+    while scan_session[scan_id]["state"] == "running":
+        try:
+            await websocket.send_json({'action': 'log', 'body': await scan_session[scan_id]["log_lines"].get()})
+        except asyncio.queues.QueueShutDown:
+            pass
+
+    await websocket.send_json({'action': 'finished'})
+    await asyncio.sleep(1) # allow client to react to our message before connection close
+
+    await websocket.close()
 
 @router.get('/')
 def all_tasks():
