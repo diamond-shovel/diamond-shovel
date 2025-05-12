@@ -1,4 +1,4 @@
-FROM gitlab.cyberspike.top:5050/docker/python:3.13
+FROM gitlab.cyberspike.top:5050/docker/python:3.13.3
 RUN sed -i 's|http://deb.debian.org/debian|http://mirrors.huaweicloud.com/debian|g; s|http://deb.debian.org/debian-security|http://mirrors.huaweicloud.com/debian-security|g' /etc/apt/sources.list.d/debian.sources
 RUN apt update && apt install -y \
     curl \
