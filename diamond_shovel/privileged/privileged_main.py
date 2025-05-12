@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import marshal
 import multiprocessing.connection
 import os
@@ -18,26 +19,27 @@ def run(queue, child_pipe: multiprocessing.connection.Connection):
     while True:
         try:
             command, client_key, *args = queue.get()
-            if hashlib.sha256(dill.dumps((command, key, *args))) != client_key:
+            if hashlib.sha256(dill.dumps((command, key, *args))).digest() != client_key:
                 continue
 
             if command == "eval_code":
                 python_bytecode, function_name = args
                 exec(marshal.loads(python_bytecode))
-                child_pipe.send(locals()[function_name]())
+                child_pipe.send(dill.dumps(locals()[function_name]()))
             elif command == "load_plugin":
                 plugin_path, = args
                 exec(open(plugin_path).read())
             elif command == "invoke_method":
                 invoke_obj, method_name, args = args
                 if invoke_obj is None:
-                    child_pipe.send(globals()[method_name](*dill.loads(args)))
+                    child_pipe.send(dill.dumps(globals()[method_name](*dill.loads(args))))
                 else:
-                    child_pipe.send(getattr(dill.loads(invoke_obj), method_name)(*dill.loads(args)))
+                    child_pipe.send(dill.dumps(getattr(dill.loads(invoke_obj), method_name)(*dill.loads(args))))
             elif command == "terminate":
                 break
         except Exception as e:
-            traceback.print_exc()
+            logging.error(f"Error while processing privileged requests {traceback.format_exc()}")
+            child_pipe.send(e)
 
 def ensure_privileged():
     """
@@ -53,9 +55,12 @@ def request_execution(python_bytecode: bytes, function_name: str):
     :params function_name: function to call
     """
     ensure_privileged()
-    hash_key = hashlib.sha256(dill.dumps(("eval_code", key, python_bytecode, function_name)))
+    hash_key = hashlib.sha256(dill.dumps(("eval_code", key, python_bytecode, function_name))).digest()
     privileged_queue.put(("eval_code", hash_key, python_bytecode, function_name))
-    return parent_pipe.recv()
+    result = dill.loads(parent_pipe.recv())
+    if isinstance(result, Exception):
+        raise result
+    return result
 
 def load_privileged_plugin(plugin_path: str):
     """
@@ -74,9 +79,12 @@ def invoke_method(invoke_obj, method_name: str, *args):
     :params args: method arguments
     """
     ensure_privileged()
-    hash_key = hashlib.sha256(dill.dumps(("invoke_method", key, dill.dumps(invoke_obj) if invoke_obj else None, method_name, dill.dumps(args))))
+    hash_key = hashlib.sha256(dill.dumps(("invoke_method", key, dill.dumps(invoke_obj) if invoke_obj else None, method_name, dill.dumps(args)))).digest()
     privileged_queue.put(("invoke_method", hash_key, dill.dumps(invoke_obj) if invoke_obj else None, method_name, dill.dumps(args)))
-    return parent_pipe.recv()
+    result = dill.loads(parent_pipe.recv())
+    if isinstance(result, Exception):
+        raise result
+    return result
 
 def terminate():
     """
@@ -84,5 +92,5 @@ def terminate():
     """
     if not privileged_queue:
         return
-    hash_key = hashlib.sha256(dill.dumps(("terminate", key)))
+    hash_key = hashlib.sha256(dill.dumps(("terminate", key))).digest()
     privileged_queue.put(("terminate", hash_key))
