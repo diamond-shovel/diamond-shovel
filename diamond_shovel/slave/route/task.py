@@ -1,11 +1,12 @@
 import multiprocessing
 import uuid
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Callable, Coroutine, Any
 
 from fastapi import APIRouter, Body, WebSocket
 from pydantic import BaseModel
 
 from diamond_shovel.function.task import WorkerPool, TaskContext
+from diamond_shovel.plugins import PluginInitContext
 from diamond_shovel.utils.func import async_helper
 
 router = APIRouter(prefix="/task", tags=["task"])
@@ -64,6 +65,20 @@ def update_task_args(params: dict, scan_id: uuid.UUID):
 
     for key, value in params.items():
         scan_session[scan_id]["ctx"][key] = value
+
+@router.post('/{scan_id}/blacklist')
+def block_task_plugins(plugins: list[str], scan_id: uuid.UUID):
+    if scan_id not in scan_session:
+        return {"error": "Scan not found"}
+
+    scan_session[scan_id]["ctx"].add_worker_filter(lambda plugin, worker: plugin.plugin_name not in plugins)
+
+@router.post('/{scan_id}/whitelist')
+def whitelist_task_plugins(plugins: list[str], scan_id: uuid.UUID):
+    if scan_id not in scan_session:
+        return {"error": "Scan not found"}
+
+    scan_session[scan_id]["ctx"].add_worker_filter(lambda plugin, worker: plugin.plugin_name in plugins)
 
 @router.post('/{scan_id}/plugins')
 def update_task_plugin_config(params: dict, scan_id: uuid.UUID):
