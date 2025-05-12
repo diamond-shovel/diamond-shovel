@@ -71,14 +71,14 @@ def update_task_args(params: dict, scan_id: uuid.UUID):
 @router.post('/{scan_id}/blacklist')
 def block_task_plugins(plugins: list[str], scan_id: uuid.UUID):
     if scan_id not in scan_session:
-        return {"error": "Scan not found"}
+        raise HTTPException(404, "Scan session not found")
 
     scan_session[scan_id]["ctx"].add_worker_filter(lambda plugin, worker: plugin.plugin_name not in plugins)
 
 @router.post('/{scan_id}/whitelist')
 def whitelist_task_plugins(plugins: list[str], scan_id: uuid.UUID):
     if scan_id not in scan_session:
-        return {"error": "Scan not found"}
+        raise HTTPException(404, "Scan session not found")
 
     scan_session[scan_id]["ctx"].add_worker_filter(lambda plugin, worker: plugin.plugin_name in plugins)
 
