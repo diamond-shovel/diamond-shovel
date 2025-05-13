@@ -2,19 +2,18 @@ import asyncio
 import logging
 import traceback
 import uuid
-from typing import Annotated, Optional, Callable, Coroutine, Any
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Body, WebSocket, HTTPException
 from pydantic import BaseModel
 
-from diamond_shovel.function.task import WorkerPool, TaskContext
-from diamond_shovel.plugins import PluginInitContext
+from diamond_shovel.function.task import TaskContext
+from diamond_shovel.function.task import worker_pool as workers
 from diamond_shovel.utils.func import async_helper
 
 router = APIRouter(prefix="/task", tags=["task"])
 
 scan_session = {}
-workers = WorkerPool()
 
 
 class TargetRequest(BaseModel):
