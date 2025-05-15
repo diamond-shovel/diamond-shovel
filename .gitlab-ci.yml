@@ -57,7 +57,7 @@ release-to-pypi:
   tags:
     - docker
   rules:
-    if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "main"
 
 trigger:
   stage: trigger
