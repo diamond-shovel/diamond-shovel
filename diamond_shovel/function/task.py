@@ -48,6 +48,7 @@ class TaskContext:
         self.__worker_tasks__: CoroutineQueue | None = None
         self.__plugin_config__ = {}
         self.__log__ = []
+        self.__worker_filters__ = []
 
     def start(self, workers):
         """
@@ -288,6 +289,23 @@ class TaskContext:
         """
         return self.__log__
 
+    def add_worker_filter(self,
+                          predicate: Callable[[PluginInitContext,
+                                               Callable[['TaskContext'], Coroutine[Any, Any, Any]]], bool]) -> None:
+        """
+        Append a filter to worker, only the worker passes all the filters can be applied to this task context
+        :params predicate: predicate function, true if the worker is accepted
+        """
+        self.__worker_filters__.append(predicate)
+
+    def filter_worker(self, owner: PluginInitContext, worker: Callable[['TaskContext'], Coroutine[Any, Any, Any]]) -> bool:
+        """
+        Checks if target worker passes filters
+        :params owner: worker owner
+        :params worker: worker function
+        """
+        return all([filter0(owner, worker) for filter0 in self.__worker_filters__])
+
 
 class ThreadLoguruHook(logging.Handler):
     def __init__(self, target_thread, cb):
@@ -365,6 +383,9 @@ class WorkerPool:
                         if not manage.is_plugin_enabled(plugin_ctx.plugin_name):
                             continue
                         for worker, nice in workers:
+                            if not ctx.filter_worker(plugin_ctx, worker):
+                                continue
+
                             logging.info(f"Dispatched worker {worker.__qualname__} for {plugin_ctx.plugin_name}")
                             task = ShovelCoroutine(plugin_ctx, worker, ctx, tg, nice)
                             all_tasks.put(task)

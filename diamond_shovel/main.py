@@ -108,7 +108,9 @@ def run_server(args):
     from . import plugins
     plugins.load_plugins(whitelist=[], blacklist=[])
     from .plugins import events
+    from .function import task
     events.call_event(events.DiamondShovelInitEvent(di["config"], False))
+    task.init()
 
     diamond_shovel.slave.server.start_api_slave(args.daemon_url)
 
