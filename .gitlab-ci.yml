@@ -53,7 +53,7 @@ release-to-pypi:
     - python -m build --wheel
     - pip install twine
     #- TWINE_PASSWORD=${CI_JOB_TOKEN} TWINE_USERNAME=gitlab-ci-token python -m twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi dist/*
-    - twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+    - twine upload --repository-url https://test.pypi.org/legacy/ -u $TWINE_USERNAME -p $TWINE_PASSWORD dist/*
   tags:
     - docker
 
