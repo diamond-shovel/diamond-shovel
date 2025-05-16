@@ -52,10 +52,12 @@ release-to-pypi:
     - pip install build
     - python -m build --wheel
     - pip install twine
-    #- TWINE_PASSWORD=${CI_JOB_TOKEN} TWINE_USERNAME=gitlab-ci-token python -m twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi dist/*
-    - twine upload -repository testpypi dist/*
+    - TWINE_PASSWORD=${CI_JOB_TOKEN} TWINE_USERNAME=gitlab-ci-token python -m twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi dist/*
+    - twine upload dist/*
   tags:
     - docker
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
 
 trigger:
   stage: trigger
