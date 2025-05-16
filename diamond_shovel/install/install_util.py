@@ -64,7 +64,7 @@ def install_config(root):
     config_generation.generate_config(config_folder)
 
 
-def perform_removal(root: pathlib.Path):
+def perform_removal(root: pathlib.Path = pathlib.Path('/')):
     if os.getuid() != 0:
         raise PermissionError("请以root权限运行安装程序")
 
@@ -93,3 +93,10 @@ def install_user():
         os.system("usermod -aG diamond-shovel diamond-shovel")
     except Exception as e:
         logging.error(f"创建用户失败: {e}")
+
+def uninstall_user():
+    try:
+        os.system("userdel -r -s diamond-shovel")
+        os.system("groupdel -r diamond-shovel")
+    except Exception as e:
+        logging.error(f"Failed: {e}")

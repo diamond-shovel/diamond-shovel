@@ -5,6 +5,7 @@ import logging
 import multiprocessing
 import os
 import pathlib
+import pwd
 import sys
 from concurrent.futures.thread import ThreadPoolExecutor
 
@@ -61,7 +62,11 @@ def main():
         install_plugin(args)
 
     if os.geteuid() == 0:
+        # we need start root daemon even running under cmdline
+        # for plugin compatibility
         start_root_daemon()
+        if args.daemon:
+            os.setuid(pwd.getpwnam("diamond-shovel").pw_uid)
 
     whitelist = args.enable_plugin
     blacklist = args.disable_plugin
@@ -163,13 +168,16 @@ def run_once(args, blacklist, whitelist):
     out_json_abs_path = os.path.abspath(args.out_json)
     loguru.logger.success(f"Output json file path: {out_json_abs_path}")
 
+    from diamond_shovel import privileged
+    privileged.terminate()
+
 
 def start_root_daemon():
     from . import privileged
     privileged.privileged_main.key = os.urandom(32)
     queue = multiprocessing.Queue()
     parent_pipe, child_pipe = multiprocessing.Pipe()
-    privileged_process = multiprocessing.Process(target=privileged.run, args=(queue, child_pipe), daemon=True)
+    privileged_process = multiprocessing.Process(target=privileged.run, args=(queue, child_pipe))
     privileged.set_privileged_context(queue, parent_pipe)
     privileged_process.start()
 

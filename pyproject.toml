@@ -58,6 +58,7 @@ dependencies = [
     "typing_extensions==4.13.2",
     "uvicorn==0.34.0",
     "websockets==15.0.1",
+    "python-multipart~=0.0.20",
 ]
 
 [tool.setuptools_scm]
@@ -72,6 +73,8 @@ Issues = "https://github.com/diamond-shovel/diamond-shovel/issues"
 [project.scripts]
 diamond-shovel = "diamond_shovel.main:main"
 
-[tool.setuptools]
-packages = ["diamond_shovel"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["diamond_shovel*"]
+exclude = ["diamond_shovel.tests*"]
 
