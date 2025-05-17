@@ -47,7 +47,27 @@ def configure_plugin(plugin_name: str, plugin_config: dict, data_path = Depends(
     config = configparser.ConfigParser()
     config.read(config_file)
 
-    for section, (option, value) in plugin_config.items():
-        config.set(section, option, value)
+    for section, section_data in plugin_config.items():
+        for key, value in section_data.items():
+            config.set(section, key, value)
 
     config.write(config_file)
+
+@router.get('/plugin/{plugin_name}')
+def get_plugin_configuration(plugin_name: str, data_path = Depends(lambda: di["data_path"])):
+    if not (data_path / "plugins" / plugin_name).exists():
+        raise HTTPException(status_code=404, detail="Plugin not found")
+    config_file = data_path / "plugins" / plugin_name / "config.ini"
+    if not config_file.exists():
+        raise HTTPException(status_code=404, detail="Config file not found")
+
+    config = configparser.ConfigParser()
+    config.read(config_file)
+
+    config_dict = {}
+    for section, section_data in config.items():
+        config_dict[section] = {}
+        for key, value in section_data.items():
+            config_dict[section][key] = value
+
+    return config_dict
