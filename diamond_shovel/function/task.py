@@ -10,7 +10,7 @@ import loguru
 
 import diamond_shovel.plugins.load
 import diamond_shovel.plugins.manage
-from . import scheduler
+from . import scheduler, models
 from .scheduler import CoroutineQueue, ShovelCoroutine
 from ..plugins import events, PluginInitContext, manage
 from ..utils.func import async_helper
@@ -48,6 +48,8 @@ class TaskContext:
         self.__worker_tasks__: CoroutineQueue | None = None
         self.__plugin_config__ = {}
         self.__log__ = []
+        self.__asset_graph__ = models.AssetGraph([])
+        self.__vulnerabilities__ = []
 
     def start(self, workers):
         """
@@ -167,8 +169,6 @@ class TaskContext:
             except Exception as e:
                 raise UnsatisfiedDependencyException(plugin_name, worker_name) from e
 
-        return None
-
     async def get_all_results(self):
         """
         Triggers the worker execution and gets all the results from workers
@@ -178,7 +178,10 @@ class TaskContext:
         if self.__worker_tasks__ is None:
             return None
 
-        return await self.__worker_tasks__.run()
+        result = await self.__worker_tasks__.run()
+        result['assets'] = self.__asset_graph__
+        result['vulnerabilities'] = self.__vulnerabilities__
+        return result
 
     async def get_remaining_workers(self, ignore_self=False):
         """
@@ -287,6 +290,12 @@ class TaskContext:
         :returns: the log
         """
         return self.__log__
+
+    def put_asset(self, asset: models.Asset):
+        self.__asset_graph__.nodes.append(asset)
+
+    def put_vulnerability(self, vulnerability: models.Vulnerability):
+        self.__vulnerabilities__.append(vulnerability)
 
 
 class ThreadLoguruHook(logging.Handler):
