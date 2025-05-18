@@ -5,10 +5,11 @@ import uuid
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Body, WebSocket, HTTPException
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from diamond_shovel.function.task import WorkerPool, TaskContext
-from diamond_shovel.utils.func import async_helper
+from diamond_shovel.utils.func import async_helper, json_util
 
 router = APIRouter(prefix="/task", tags=["task"])
 
@@ -45,11 +46,11 @@ async def get_task(scan_id: uuid.UUID):
     if scan_id not in scan_session:
         raise HTTPException(404, "Scan session not found")
 
-    return {
+    return jsonable_encoder({
         "state": scan_session[scan_id]["state"],
         "result": await scan_session[scan_id]["ctx"].get_all_results(),
         "log": scan_session[scan_id]["ctx"].get_log()
-    }
+    }, custom_encoder=json_util.get_encoder())
 
 @router.delete('/{scan_id}')
 def delete_task(scan_id: uuid.UUID):
@@ -59,6 +60,8 @@ def delete_task(scan_id: uuid.UUID):
 
         del scan_session[scan_id]
 
+    return {'detail': 'ok'}
+
 @router.post('/{scan_id}')
 def update_task_args(params: dict, scan_id: uuid.UUID):
     if scan_id not in scan_session:
@@ -67,6 +70,8 @@ def update_task_args(params: dict, scan_id: uuid.UUID):
     for key, value in params.items():
         scan_session[scan_id]["ctx"][key] = value
 
+    return {'detail': 'ok'}
+
 @router.post('/{scan_id}/plugins')
 def update_task_plugin_config(params: dict, scan_id: uuid.UUID):
     if scan_id not in scan_session:
@@ -74,6 +79,8 @@ def update_task_plugin_config(params: dict, scan_id: uuid.UUID):
 
     for plugin_name, plugin_config in params.items():
         scan_session[scan_id]["ctx"].set_plugin_config(plugin_name, plugin_config)
+
+    return {'detail': 'ok'}
 
 @router.get('/{scan_id}/start')
 def start_task(scan_id: uuid.UUID):
@@ -94,6 +101,8 @@ def start_task(scan_id: uuid.UUID):
     scan_session[scan_id]["state"] = "running"
     loop = async_helper.threaded_async_run(task_runner())
     scan_session[scan_id]["loop"] = loop
+
+    return {'detail': 'ok'}
 
 @router.websocket('/ws/{scan_id}')
 async def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
