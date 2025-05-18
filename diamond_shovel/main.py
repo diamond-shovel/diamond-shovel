@@ -154,10 +154,10 @@ def run_once(args, blacklist, whitelist):
     with open(args.out_json, "w") as f:
         scan_result = asyncio.run(task.run_full_scan(ctx))
         try:
-            f.write(json.dumps(scan_result, indent=4, cls=json_util.ExceptionExtendedEncoder))
+            f.write(json.dumps(scan_result, indent=4, cls=json_util.get_encoder()))
         except Exception as e:
             scan_result['deserialization_failure'] = e
-            f.write(json.dumps(scan_result, indent=4, cls=json_util.ExceptionExtendedEncoder, skipkeys=True))
+            f.write(json.dumps(scan_result, indent=4, cls=json_util.get_encoder(), skipkeys=True))
     out_json_abs_path = os.path.abspath(args.out_json)
     loguru.logger.success(f"Output json file path: {out_json_abs_path}")
 
