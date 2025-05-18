@@ -5,8 +5,9 @@ import uvicorn
 from fastapi import FastAPI
 
 from diamond_shovel.slave.route import plugin, task
+from diamond_shovel.utils.func import json_util
 
-app = FastAPI()
+app = FastAPI(json_encoder=json_util.get_encoder())
 
 app.include_router(plugin.router)
 app.include_router(task.router)
