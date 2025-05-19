@@ -109,6 +109,7 @@ def run_server(args):
         "root": args.daemon_workdir,
         "daemon": True
     }
+    os.chdir(args.daemon_workdir)
 
     from . import plugins
     plugins.load_plugins(whitelist=[], blacklist=[])
