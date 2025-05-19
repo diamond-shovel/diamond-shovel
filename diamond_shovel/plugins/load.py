@@ -52,6 +52,9 @@ class PluginInitContext:
 
         self.__threaded_attached_modified_container__ = {}
 
+        # trigger config extraction
+        _ = self.config
+
     def setup_base_container(self):
         """
         Initializes the dependency container of current plugin
