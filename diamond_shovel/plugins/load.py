@@ -39,6 +39,7 @@ class PluginInitContext:
         self.__config_overrider__ = []
 
         if run_context["daemon"]:
+            pathlib.Path(run_context["root"] / "etc" / "diamond-shovel" / "plugins").mkdir(exist_ok=True)
             self.__config_file__ = pathlib.Path(run_context["root"]) / "etc" / "diamond-shovel" / "plugins" / (
                     plugin_name + ".ini")
         else:
