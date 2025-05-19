@@ -7,10 +7,11 @@ import subprocess
 import sys
 import tarfile
 import zipfile
+from configparser import ConfigParser
 from optparse import Values
 from tempfile import mkdtemp
 
-from kink import inject
+from kink import inject, di
 from pip._internal.cli.req_command import RequirementCommand
 from pip._internal.models.target_python import TargetPython
 from pip._internal.operations.build.build_tracker import get_build_tracker
@@ -36,7 +37,10 @@ def initalize_pip_options(options):
     options.cert = options.client_cert = options.find_links = options.format_control = options.proxy = None
     options.timeout = 300
     options.pre = options.prefer_binary = False
-    options.index_url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"
+
+    cfg: ConfigParser = di['config']
+    options.index_url = cfg.get('plugin', 'library-index')
+
     options.extra_index_urls = ["https://pypi.org/simple"]
     options.no_index = False
     options.constraints = options.editables = options.requirements = []
