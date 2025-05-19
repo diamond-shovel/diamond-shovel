@@ -38,12 +38,7 @@ class PluginInitContext:
         self.__data_folder__ = data_path / "plugins" / plugin_name
         self.__config_overrider__ = []
 
-        if run_context["daemon"]:
-            pathlib.Path(run_context["root"] / "etc" / "diamond-shovel" / "plugins").mkdir(exist_ok=True)
-            self.__config_file__ = pathlib.Path(run_context["root"]) / "etc" / "diamond-shovel" / "plugins" / (
-                    plugin_name + ".ini")
-        else:
-            self.__config_file__ = self.__data_folder__ / "config.ini"
+        self.__config_file__ = self.__data_folder__ / "config.ini"
         self.__run_context__ = run_context
         self.__archive__ = archive
 
@@ -77,12 +72,6 @@ class PluginInitContext:
             self.__config_file__.parent.mkdir(parents=True, exist_ok=True)
             if any([tarinfo for tarinfo in self.__archive__.getmembers() if tarinfo.name == 'config.ini']):
                 self.extract_resource("config.ini")
-                if self.__run_context__["daemon"]:
-                    from ..privileged import invoke_method
-                    try:
-                        invoke_method(os, "rename", self.__data_folder__ / "config.ini", self.__config_file__)
-                    except RuntimeError: # we are not running as root
-                        os.rename(self.__data_folder__ / "config.ini", self.__config_file__)
         if self.__config_file__.exists():
             with open(self.__config_file__, "r") as f:
                 config.read_file(f)
