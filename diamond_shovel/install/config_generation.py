@@ -29,6 +29,9 @@ def generate_config(target_dir: pathlib.Path):
         config.set('logging', 'level', '1')
         config.set('logging', 'color', 'true')
 
+        config.add_section('plugin')
+        config.set('plugin', 'library-index', 'https://mirrors.aliyun.com/pypi/simple/')
+
         config.write(f)
 
         f.flush()
