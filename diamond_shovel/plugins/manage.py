@@ -24,6 +24,8 @@ def load_plugins(data_path: pathlib.Path, whitelist: list[str] = None, blacklist
         plugin_path.mkdir(parents=True)
 
     for file in plugin_path.iterdir():
+        load_data = None
+
         try:
             if not file.is_file():
                 continue
@@ -35,6 +37,7 @@ def load_plugins(data_path: pathlib.Path, whitelist: list[str] = None, blacklist
                     continue
                 name, load_data = load_info
             if load_data:
+                load_data['file'] = file
                 plugin_table[name] = load_data
         except Exception:
             loguru.logger.error(f"Failed to load plugin {file}: {traceback.format_exc()}")
