@@ -51,7 +51,8 @@ def configure_plugin(plugin_name: str, plugin_config: dict, data_path = Depends(
         for key, value in section_data.items():
             config.set(section, key, value)
 
-    config.write(config_file)
+    with open(str(config_file), "w") as f:
+        config.write(f)
 
 @router.get('/plugin/{plugin_name}')
 def get_plugin_configuration(plugin_name: str, data_path = Depends(lambda: di["data_path"])):
