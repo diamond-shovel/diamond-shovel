@@ -373,7 +373,7 @@ class WorkerPool:
             if loguru_handler is not None:
                 current_thread = threading.current_thread()
 
-                loguru_handler_id = loguru.logger.add(sink=ThreadLoguruHook(current_thread, loguru_handler))
+                loguru_handler_id = loguru.logger.add(sink=ThreadLoguruHook(current_thread, loguru_handler), colorize=True)
 
             try:
                 async with asyncio.TaskGroup() as tg:
