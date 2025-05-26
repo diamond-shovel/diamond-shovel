@@ -3,6 +3,8 @@ import os
 import pathlib
 import shutil
 
+from cryptography.hazmat.primitives._serialization import PublicFormat
+
 from . import config_generation
 
 
@@ -62,6 +64,22 @@ def install_config(root):
     config_folder = root / "etc" / "diamond-shovel"
     config_folder.mkdir(parents=True, exist_ok=True)
     config_generation.generate_config(config_folder)
+
+
+def install_cryptography_key(root):
+    key_folder = root / "var" / "lib" / "diamond-shovel" / "keys"
+    key_folder.mkdir(parents=True, exist_ok=True)
+    key_folder.chmod(0o644)
+
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, NoEncryption, PublicFormat
+    private_key = ec.generate_private_key(ec.SECP256K1())
+    with open(key_folder / "private_key.pem", "wb") as f:
+        f.write(private_key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()))
+    with open(key_folder / "public_key.pem", "wb") as f:
+        f.write(private_key.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
+
+    # TODO: add installation message, as i don't have input method now
 
 
 def perform_removal(root: pathlib.Path = pathlib.Path('/')):
