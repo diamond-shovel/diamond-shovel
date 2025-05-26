@@ -33,8 +33,11 @@ async def install_plugin(file: UploadFile, data_path = Depends(lambda: di["data_
 
 @router.delete('/plugin/{plugin_name}')
 def uninstall_plugin(plugin_name: str, data_path = Depends(lambda: di["data_path"])):
+    if plugin_name not in plugin_table:
+        raise HTTPException(status_code=404, detail="Plugin not found")
+
     shutil.rmtree(data_path / "plugins" / plugin_name)
-    (data_path / "plugins" / plugin_table['file']).unlink()
+    (data_path / "plugins" / plugin_table[plugin_name]['file']).unlink()
 
 @router.post('/plugin/{plugin_name}')
 def configure_plugin(plugin_name: str, plugin_config: dict, data_path = Depends(lambda: di["data_path"])):
