@@ -42,11 +42,7 @@ async def validate_peer_signature(request: Request, x_signature: Annotated[str |
 
     verified = False
     for key_name, (key, verified_count, signed_count) in _peer_keys.items():
-        sha = hashlib.sha256()
-        sha.update(struct.pack("<I", verified_count))
-        sha.update(request.url.path.encode("utf8"))
-        sha.update(await request.body())
-        result = sha.digest()
+        result = await digest_request(request, verified_count)
         try:
             key.verify(base64.b64decode(x_signature), result, ECDSA(Prehashed(SHA256())))
         except InvalidSignature:
@@ -59,14 +55,29 @@ async def validate_peer_signature(request: Request, x_signature: Annotated[str |
     if not verified:
         raise HTTPException(status_code=403, detail="Invalid signature")
 
+
+async def digest_request(request, verified_count):
+    sha = hashlib.sha256()
+    sha.update(struct.pack("<I", verified_count))
+    sha.update(request.url.path.encode("utf8"))
+    sha.update(await request.body())
+    result = sha.digest()
+    return result
+
+
 async def sign_response(request: Request, response: Response):
     yield
 
     key, verified_count, signed_count = _peer_keys[request.state.source]
 
+    result = await digest_response(response, signed_count)
+    response.headers['X-Signature'] = str(base64.b64encode(_private_key.sign(result, ECDSA(Prehashed(SHA256())))))
+    _peer_keys[request.state.source] = key, signed_count + 1, signed_count
+
+
+async def digest_response(response, signed_count):
     sha = hashlib.sha256()
     sha.update(struct.pack("<I", signed_count))
     sha.update(await response.body())
     result = sha.digest()
-    response.headers['X-Signature'] = str(base64.b64encode(_private_key.sign(result, ECDSA(Prehashed(SHA256())))))
-    _peer_keys[request.state.source] = key, signed_count + 1, signed_count
+    return result
