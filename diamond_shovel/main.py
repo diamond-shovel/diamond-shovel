@@ -13,7 +13,6 @@ import loguru
 from kink import di, inject
 
 import diamond_shovel.config
-import diamond_shovel.slave.server
 import diamond_shovel.utils.func
 from diamond_shovel.cli import historian
 from diamond_shovel.function.binary_manager import BinaryManager
@@ -117,6 +116,8 @@ def run_server(args):
     from .function import task
     events.call_event(events.DiamondShovelInitEvent(di["config"], False))
     task.init()
+
+    import diamond_shovel.slave.server
 
     diamond_shovel.slave.server.start_api_slave(args.daemon_url)
 
