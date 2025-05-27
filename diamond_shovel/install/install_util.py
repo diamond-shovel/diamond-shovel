@@ -3,8 +3,6 @@ import os
 import pathlib
 import shutil
 
-from cryptography.hazmat.primitives._serialization import PublicFormat
-
 from . import config_generation
 
 
@@ -70,6 +68,10 @@ def install_cryptography_key(root):
     key_folder = root / "var" / "lib" / "diamond-shovel" / "keys"
     key_folder.mkdir(parents=True, exist_ok=True)
     key_folder.chmod(0o644)
+
+    peer_key_folder = key_folder / "peer"
+    peer_key_folder.mkdir(parents=True, exist_ok=True)
+    peer_key_folder.chmod(0o644)
 
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, NoEncryption, PublicFormat
