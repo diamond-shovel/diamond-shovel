@@ -28,7 +28,7 @@
 
 请注意, 正如上述简介所述, *Diamond Shovel*本身并不会做太多的事情, 您需要通过编写插件或者安装额外的插件来达到您的需要.
 
-您可以在[这里](https://github.com/diamond-shovel/diamond-shovel-plugins)找到我们预先免费提供的插件, 但请注意社区版钻石铲并不能正确识别`.ore`结尾的插件包.
+您可以在[这里](https://github.com/ansanyuan/shovel-workbench)找到我们预先免费提供的插件, 但请注意社区版钻石铲并不能正确识别`.ore`结尾的插件包.
 
 ### 安装
 
