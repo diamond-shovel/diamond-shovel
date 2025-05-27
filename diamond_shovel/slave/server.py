@@ -1,12 +1,17 @@
-import logging
 import urllib.parse
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 
 from diamond_shovel.slave.route import plugin, task, management
+from diamond_shovel.slave import security
 
-app = FastAPI()
+security.init()
+
+app = FastAPI(dependencies=[
+    Depends(security.validate_peer_signature),
+    Depends(security.sign_response)
+])
 
 app.include_router(plugin.router)
 app.include_router(task.router)
