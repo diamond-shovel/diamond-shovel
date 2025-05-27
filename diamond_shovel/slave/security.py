@@ -68,6 +68,9 @@ async def digest_request(request, verified_count):
 async def sign_response(request: Request, response: Response):
     yield
 
+    if not request.state.source:
+        return
+
     key, verified_count, signed_count = _peer_keys[request.state.source]
 
     result = await digest_response(response, signed_count)
