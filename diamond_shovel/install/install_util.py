@@ -28,6 +28,8 @@ def perform_installation(root: pathlib.Path = pathlib.Path("/")):
     logging.info("创建数据文件夹...")
     install_data_folder(root)
 
+    install_cryptography_key(root)
+
     logging.info("创建运行文件夹...")
     install_runtime_folder(root)
 
