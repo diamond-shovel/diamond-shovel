@@ -28,6 +28,7 @@ def perform_installation(root: pathlib.Path = pathlib.Path("/")):
     logging.info("创建数据文件夹...")
     install_data_folder(root)
 
+    logging.info("生成协议密钥...")
     install_cryptography_key(root)
 
     logging.info("创建运行文件夹...")
@@ -42,14 +43,14 @@ def perform_installation(root: pathlib.Path = pathlib.Path("/")):
 def install_log_folder(root):
     log_folder = root / "var" / "log" / "diamond-shovel"
     log_folder.mkdir(parents=True, exist_ok=True)
-    log_folder.chmod(0o644)
+    log_folder.chmod(0o755)
     shutil.chown(log_folder, "diamond-shovel", "diamond-shovel")
 
 
 def install_runtime_folder(root):
     run_folder = root / "var" / "run" / "diamond-shovel"
     run_folder.mkdir(parents=True, exist_ok=True)
-    run_folder.chmod(0o644)
+    run_folder.chmod(0o755)
     shutil.chown(run_folder, "diamond-shovel", "diamond-shovel")
 
 
@@ -69,21 +70,33 @@ def install_config(root):
 def install_cryptography_key(root):
     key_folder = root / "var" / "lib" / "diamond-shovel" / "keys"
     key_folder.mkdir(parents=True, exist_ok=True)
-    key_folder.chmod(0o644)
+    key_folder.chmod(0o755)
+    shutil.chown(key_folder, "diamond-shovel", "diamond-shovel")
 
     peer_key_folder = key_folder / "peer"
     peer_key_folder.mkdir(parents=True, exist_ok=True)
-    peer_key_folder.chmod(0o644)
+    peer_key_folder.chmod(0o755)
+    shutil.chown(peer_key_folder, "diamond-shovel", "diamond-shovel")
 
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, NoEncryption, PublicFormat
-    private_key = ec.generate_private_key(ec.SECP256K1())
-    with open(key_folder / "private_key.pem", "wb") as f:
-        f.write(private_key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()))
-    with open(key_folder / "public_key.pem", "wb") as f:
-        f.write(private_key.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
+    private_key_data = ec.generate_private_key(ec.SECP256K1())
 
-    # TODO: add installation message, as i don't have input method now
+    private_key = key_folder / "private_key.pem"
+    public_key = key_folder / "public_key.pem"
+
+    # set permission before writing private key, avoids race condition to leak private key
+    with open(private_key, "wb") as f:
+        private_key.chmod(0o600)
+        shutil.chown(private_key, "diamond-shovel", "diamond-shovel")
+        f.write(private_key_data.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()))
+
+    with open(public_key, "wb") as f:
+        public_key.chmod(0o644)
+        shutil.chown(public_key, "diamond-shovel", "diamond-shovel")
+        f.write(private_key_data.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
+
+    logging.info(f"`{public_key}` 将会是diamond-shovel签名时的公钥")
 
 
 def perform_removal(root: pathlib.Path = pathlib.Path('/')):

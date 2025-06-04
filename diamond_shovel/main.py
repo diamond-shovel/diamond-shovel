@@ -16,6 +16,9 @@ from diamond_shovel.cli import historian
 from diamond_shovel.function.binary_manager import BinaryManager
 from diamond_shovel.utils.func import json_util
 
+# import pydevd_pycharm
+# pydevd_pycharm.settrace('172.17.0.1', port=3389, stdoutToServer=True, stderrToServer=True)
+
 
 def main():
     diamond_shovel.utils.func.init()

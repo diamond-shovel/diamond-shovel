@@ -30,9 +30,13 @@ COPY . /data
 RUN pip config set global.index-url https://mirrors.huaweicloud.com/repository/pypi/simple && \
     pip3 install build setuptools setuptools-scm --break-system-packages && \
     python3 -m build -wn && \
-    pip3 install ./dist/*.whl --break-system-packages
+    pip3 install ./dist/*.whl --break-system-packages && \
+    pip3 install pydevd-pycharm~=251.25410.159 --break-system-packages
 
 RUN diamond-shovel -I
+
+WORKDIR /var/lib/diamond-shovel
+RUN rm -rf /data
 
 EXPOSE 8848
 ENTRYPOINT ["diamond-shovel", "-D", "-U", "http://0.0.0.0:8848/"]

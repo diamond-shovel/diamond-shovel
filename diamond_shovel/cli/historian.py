@@ -99,6 +99,7 @@ def new_log(directory, idx):
     target_file = pathlib.Path(directory).joinpath(f'{today.strftime("%Y-%m-%d")}-{idx}.log')
     return target_file
 
+
 _config = {}
 
 
