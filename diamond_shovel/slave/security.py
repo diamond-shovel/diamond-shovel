@@ -18,6 +18,7 @@ from kink import inject
 _private_key: ec.EllipticCurvePrivateKey
 _peer_keys: dict[str, tuple[ec.EllipticCurvePublicKey, int, int]] = {}
 
+
 @inject
 def init(run_context):
     global _private_key
@@ -33,6 +34,7 @@ def init(run_context):
             continue
         with open(key_file, "rb") as f:
             _peer_keys[key_file.name] = serialization.load_pem_public_key(f.read()), 0, 0
+
 
 async def validate_peer_signature(request: Request, x_signature: Annotated[str | None, Header()] = None):
     if len(_peer_keys) == 0:
@@ -65,10 +67,8 @@ async def digest_request(request, verified_count):
     return result
 
 
-async def sign_response(request: Request, response: Response):
-    yield
-
-    if not request.state.source:
+async def _sign_response(request: Request, response: Response):
+    if not hasattr(request.state, 'source') or not request.state.source:
         return
 
     key, verified_count, signed_count = _peer_keys[request.state.source]
@@ -78,9 +78,24 @@ async def sign_response(request: Request, response: Response):
     _peer_keys[request.state.source] = key, signed_count + 1, signed_count
 
 
+def put_sign_response_middleware(app):
+    @app.middleware("http")
+    async def middleware_handler(request: Request, call_next):
+        response = await call_next(request)
+        await _sign_response(request, response)
+        return response
+
+
+async def _read_response_body(response):
+    chunks = []
+    async for chunk in response.body_iterator:
+        chunks.append(chunk)
+    return b''.join(chunks)
+
+
 async def digest_response(response, signed_count):
     sha = hashlib.sha256()
     sha.update(struct.pack("<I", signed_count))
-    sha.update(await response.body())
+    sha.update(await _read_response_body(response))
     result = sha.digest()
     return result

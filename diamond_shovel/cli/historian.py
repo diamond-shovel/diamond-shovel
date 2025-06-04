@@ -21,6 +21,7 @@ default_config.set('logging', 'color', 'true')
 
 target_file = None
 
+
 class LenientFormatLogRecord(logging.LogRecord):
     def getMessage(self):
         msg = str(self.msg)
@@ -31,6 +32,7 @@ class LenientFormatLogRecord(logging.LogRecord):
             else:
                 msg = msg.format(*self.args)
         return msg
+
 
 class TaskLoggingHandler(logging.Handler):
     def __init__(self):
@@ -43,21 +45,25 @@ class TaskLoggingHandler(logging.Handler):
         msg = self.format(record)
         task.log(msg)
 
+
 def find_issuing_plugin():
     for f in inspect.stack():
         if f.frame.f_globals['__package__'] in plugin_table:
             return f.frame.f_globals['__package__']
     return 'diamond_shovel'
 
+
 def format_running_logger(*args, **kwargs):
     rec = LenientFormatLogRecord(*args, **kwargs)
     rec.runner = find_issuing_plugin()
     return rec
 
+
 def wipe_old_handler(logger):
     for handler in logger.handlers:
         if hasattr(handler, 'shovel_attached'):
             logger.removeHandler(handler)
+
 
 def archive_legacy(directory):
     global target_file
@@ -75,11 +81,13 @@ def archive_legacy(directory):
                 f.add(log_file)
             log_file.unlink(missing_ok=True)
 
+
 def new_log(directory, idx):
     global target_file
     today = datetime.datetime.today()
     target_file = pathlib.Path(directory).joinpath(f'{today.strftime("%Y-%m-%d")}-{idx}.log')
     return target_file
+
 
 @inject
 def setup_logger(config: ConfigParser = default_config):
@@ -124,4 +132,3 @@ def setup_logger(config: ConfigParser = default_config):
     task_handler = TaskLoggingHandler()
     setattr(task_handler, 'shovel_attached', True)
     logging.root.addHandler(task_handler)
-

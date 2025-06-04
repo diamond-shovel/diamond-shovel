@@ -10,12 +10,14 @@ security.init()
 
 app = FastAPI(dependencies=[
     Depends(security.validate_peer_signature),
-    Depends(security.sign_response)
 ])
+
+security.put_sign_response_middleware(app)
 
 app.include_router(plugin.router)
 app.include_router(task.router)
 app.include_router(management.router)
+
 
 def start_api_slave(url):
     parsed = urllib.parse.urlparse(url)
