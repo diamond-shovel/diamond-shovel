@@ -2,7 +2,7 @@ import asyncio
 import logging
 import traceback
 import uuid
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Any
 
 from fastapi import APIRouter, Body, WebSocket, HTTPException
 from pydantic import BaseModel
@@ -20,6 +20,12 @@ class TargetRequest(BaseModel):
     companies: Optional[list[str]]
     domains: Optional[list[str]]
     ips: Optional[list[str]]
+
+
+class PreviousContext(BaseModel):
+    prev_worker_result: Optional[dict[str, Any]]
+    prev_ctx: Optional[dict[str, Any]]
+
 
 @router.put('/')
 def new_task(target: Annotated[TargetRequest, Body(embed=True)]):
@@ -40,6 +46,7 @@ def new_task(target: Annotated[TargetRequest, Body(embed=True)]):
 
     return {"scan_id": scan_id}
 
+
 @router.get('/{scan_id}')
 async def get_task(scan_id: uuid.UUID):
     if scan_id not in scan_session:
@@ -48,8 +55,10 @@ async def get_task(scan_id: uuid.UUID):
     return {
         "state": scan_session[scan_id]["state"],
         "result": await scan_session[scan_id]["ctx"].get_all_results(),
-        "log": scan_session[scan_id]["ctx"].get_log()
+        "log": scan_session[scan_id]["ctx"].get_log(),
+        "context": {key: value for key, value in scan_session[scan_id]["ctx"].items()}
     }
+
 
 @router.delete('/{scan_id}')
 def delete_task(scan_id: uuid.UUID):
@@ -59,13 +68,14 @@ def delete_task(scan_id: uuid.UUID):
 
         del scan_session[scan_id]
 
+
 @router.post('/{scan_id}')
-def update_task_args(params: dict, scan_id: uuid.UUID):
+def merge_context(prev_ctx: PreviousContext, scan_id: uuid.UUID):
     if scan_id not in scan_session:
         raise HTTPException(404, "Scan session not found")
 
-    for key, value in params.items():
-        scan_session[scan_id]["ctx"][key] = value
+    scan_session[scan_id]["ctx"].update(prev_ctx.prev_worker_result, prev_ctx.prev_ctx)
+
 
 @router.post('/{scan_id}/blacklist')
 def block_task_plugins(plugins: list[str], scan_id: uuid.UUID):
@@ -74,12 +84,14 @@ def block_task_plugins(plugins: list[str], scan_id: uuid.UUID):
 
     scan_session[scan_id]["ctx"].add_worker_filter(lambda plugin, worker: plugin.plugin_name not in plugins)
 
+
 @router.post('/{scan_id}/whitelist')
 def whitelist_task_plugins(plugins: list[str], scan_id: uuid.UUID):
     if scan_id not in scan_session:
         raise HTTPException(404, "Scan session not found")
 
     scan_session[scan_id]["ctx"].add_worker_filter(lambda plugin, worker: plugin.plugin_name in plugins)
+
 
 @router.post('/{scan_id}/plugins')
 def update_task_plugin_config(params: dict, scan_id: uuid.UUID):
@@ -88,6 +100,7 @@ def update_task_plugin_config(params: dict, scan_id: uuid.UUID):
 
     for plugin_name, plugin_config in params.items():
         scan_session[scan_id]["ctx"].set_plugin_config(plugin_name, plugin_config)
+
 
 @router.get('/{scan_id}/start')
 def start_task(scan_id: uuid.UUID):
@@ -109,6 +122,7 @@ def start_task(scan_id: uuid.UUID):
     loop = async_helper.threaded_async_run(task_runner())
     scan_session[scan_id]["loop"] = loop
 
+
 @router.websocket('/ws/{scan_id}')
 async def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
     if scan_id not in scan_session:
@@ -123,9 +137,10 @@ async def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
             pass
 
     await websocket.send_json({'action': 'finished'})
-    await asyncio.sleep(1) # allow client to react to our message before connection close
+    await asyncio.sleep(1)  # allow client to react to our message before connection close
 
     await websocket.close()
+
 
 @router.get('/')
 def all_tasks():

@@ -13,6 +13,7 @@ local = threading.local()
 async def call_sync(func, *args, **kwargs):
     if not is_current_async():
         raise RuntimeError("Just call it directly.")
+
     def sync_wrapper():
         local.from_async = True
         result = func(*args, **kwargs)
@@ -20,6 +21,7 @@ async def call_sync(func, *args, **kwargs):
         return result
 
     return await asyncio.get_running_loop().run_in_executor(pool, sync_wrapper)
+
 
 def call_async(func, *args, **kwargs):
     if is_current_async():
@@ -29,6 +31,7 @@ def call_async(func, *args, **kwargs):
     if getattr(local, 'from_async', False):
         blocker = Condition()
         future = asyncio.ensure_future(coro, loop=asyncio.get_event_loop())
+
         def callback(*_):
             blocker.acquire()
             blocker.notify_all()
@@ -53,8 +56,10 @@ def run_async(coro: Coroutine):
     else:
         return asyncio.run(coro)
 
+
 def start_async(coro: Coroutine):
     pool.submit(run_async, coro)
+
 
 def is_current_async():
     try:
@@ -62,6 +67,7 @@ def is_current_async():
     except RuntimeError:
         return False
     return loop and loop.is_running()
+
 
 async def timed_await(coro, timeout):
     try:
@@ -72,21 +78,27 @@ async def timed_await(coro, timeout):
         logging.debug("Got interrupted.")
         raise
 
+
 def is_coroutine(coro):
     return asyncio.iscoroutine(coro) or asyncio.iscoroutinefunction(coro) or asyncio.isfuture(coro)
 
 
 def disallows_direct_async(func):
     func._disallow_direct_async = True
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         if is_current_async() and not getattr(local, 'from_async', False):
-            raise RuntimeError(f"Function {func.__name__} cannot be called directly from an async context. Please use `async_helper.call_async` instead.")
+            raise RuntimeError(
+                f"Function {func.__name__} cannot be called directly from an async context. Please use `async_helper.call_async` instead.")
         return func(*args, **kwargs)
+
     return wrapper
+
 
 def threaded_async_run(coro):
     loop = asyncio.new_event_loop()
+
     def new_threaded_event_loop():
         asyncio.set_event_loop(loop)
         asyncio.run(coro)

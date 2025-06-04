@@ -10,6 +10,7 @@ privileged_queue: multiprocessing.Queue = None
 key = None
 parent_pipe: multiprocessing.connection.Connection = None
 
+
 def run(queue, child_pipe: multiprocessing.connection.Connection):
     """
     Root daemon method, provides service to access root
@@ -41,12 +42,14 @@ def run(queue, child_pipe: multiprocessing.connection.Connection):
             logging.error(f"Error while processing privileged requests {traceback.format_exc()}")
             child_pipe.send(e)
 
+
 def ensure_privileged():
     """
     Makes sure privileged daemon is enabled
     """
     if not privileged_queue or not parent_pipe:
         raise RuntimeError("Privileged queue not set")
+
 
 def request_execution(python_bytecode: bytes, function_name: str):
     """
@@ -62,6 +65,7 @@ def request_execution(python_bytecode: bytes, function_name: str):
         raise result
     return result
 
+
 def load_privileged_plugin(plugin_path: str):
     """
     Requests a plugin loading on root user
@@ -71,6 +75,7 @@ def load_privileged_plugin(plugin_path: str):
     hash_key = hashlib.sha256(dill.dumps(("load_plugin", key, plugin_path)))
     privileged_queue.put(("load_plugin", hash_key, plugin_path))
 
+
 def invoke_method(invoke_obj, method_name: str, *args):
     """
     Requests a python method invocation on target object
@@ -79,12 +84,15 @@ def invoke_method(invoke_obj, method_name: str, *args):
     :params args: method arguments
     """
     ensure_privileged()
-    hash_key = hashlib.sha256(dill.dumps(("invoke_method", key, dill.dumps(invoke_obj) if invoke_obj else None, method_name, dill.dumps(args)))).digest()
-    privileged_queue.put(("invoke_method", hash_key, dill.dumps(invoke_obj) if invoke_obj else None, method_name, dill.dumps(args)))
+    hash_key = hashlib.sha256(dill.dumps(
+        ("invoke_method", key, dill.dumps(invoke_obj) if invoke_obj else None, method_name, dill.dumps(args)))).digest()
+    privileged_queue.put(
+        ("invoke_method", hash_key, dill.dumps(invoke_obj) if invoke_obj else None, method_name, dill.dumps(args)))
     result = dill.loads(parent_pipe.recv())
     if isinstance(result, Exception):
         raise result
     return result
+
 
 def terminate():
     """

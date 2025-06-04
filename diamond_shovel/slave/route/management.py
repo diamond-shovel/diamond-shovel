@@ -21,26 +21,29 @@ def restart_slave():
     try:
         privileged_main.invoke_method(os, "execve", sys.argv[0], sys.argv, os.environ)
     except:
-        pass # will raise EOF as execve terminates the behavior of root daemon
+        pass  # will raise EOF as execve terminates the behavior of root daemon
 
     # we are in a forked process running in `diamond-shovel` user, terminate self
     signal.raise_signal(signal.SIGINT)
 
+
 @router.post('/plugin')
-async def install_plugin(file: UploadFile, data_path = Depends(lambda: di["data_path"])):
+async def install_plugin(file: UploadFile, data_path=Depends(lambda: di["data_path"])):
     with open(data_path / "plugins" / file.filename, 'wb') as f:
         privileged_main.invoke_method(f, "write", await file.read())
 
+
 @router.delete('/plugin/{plugin_name}')
-def uninstall_plugin(plugin_name: str, data_path = Depends(lambda: di["data_path"])):
+def uninstall_plugin(plugin_name: str, data_path=Depends(lambda: di["data_path"])):
     if plugin_name not in plugin_table:
         raise HTTPException(status_code=404, detail="Plugin not found")
 
     shutil.rmtree(data_path / "plugins" / plugin_name)
     (data_path / "plugins" / plugin_table[plugin_name]['file']).unlink()
 
+
 @router.post('/plugin/{plugin_name}')
-def configure_plugin(plugin_name: str, plugin_config: dict, data_path = Depends(lambda: di["data_path"])):
+def configure_plugin(plugin_name: str, plugin_config: dict, data_path=Depends(lambda: di["data_path"])):
     if not (data_path / "plugins" / plugin_name).exists():
         raise HTTPException(status_code=404, detail="Plugin not found")
     config_file = data_path / "plugins" / plugin_name / "config.ini"
@@ -57,8 +60,9 @@ def configure_plugin(plugin_name: str, plugin_config: dict, data_path = Depends(
     with open(str(config_file), "w") as f:
         config.write(f)
 
+
 @router.get('/plugin/{plugin_name}')
-def get_plugin_configuration(plugin_name: str, data_path = Depends(lambda: di["data_path"])):
+def get_plugin_configuration(plugin_name: str, data_path=Depends(lambda: di["data_path"])):
     if not (data_path / "plugins" / plugin_name).exists():
         raise HTTPException(status_code=404, detail="Plugin not found")
     config_file = data_path / "plugins" / plugin_name / "config.ini"

@@ -157,6 +157,19 @@ class ShovelCoroutine:
         return await self._result
 
 
+class CompletedShovelCoroutine(ShovelCoroutine):
+    def __init__(self, finished_worker_name: str, result: typing.Any):
+        super().__init__(None, None, None, None, 0)
+        self._result = asyncio.get_running_loop().create_future()
+        self._name = finished_worker_name
+        self._task = asyncio.get_running_loop().create_task(dummy(None))
+        self._result.set_result(result)
+
+    @property
+    def done(self):
+        return True
+
+
 coroutine_wrapper_mapping: [typing.Coroutine, ShovelCoroutine] = {}
 
 

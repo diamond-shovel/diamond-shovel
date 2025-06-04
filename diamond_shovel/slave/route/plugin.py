@@ -4,6 +4,7 @@ import diamond_shovel.plugins
 
 router = APIRouter(prefix="/plugin", tags=["plugin"])
 
+
 @router.get("/")
 def list_plugins():
     result = {}
@@ -17,17 +18,20 @@ def list_plugins():
         }
     return result
 
+
 @router.put("/{plugin_name}")
 def enable_plugin(plugin_name: str):
     if plugin_name not in diamond_shovel.plugins.manage.plugin_table:
         raise HTTPException(status_code=404, detail="Plugin not found")
     diamond_shovel.plugins.manage.set_plugin_enabled(plugin_name, True)
 
+
 @router.delete("/{plugin_name}")
 def disable_plugin(plugin_name: str):
     if plugin_name not in diamond_shovel.plugins.manage.plugin_table:
         raise HTTPException(status_code=404, detail="Plugin not found")
     diamond_shovel.plugins.manage.set_plugin_enabled(plugin_name, False)
+
 
 @router.get("/{plugin_name}")
 def get_plugin(plugin_name: str):

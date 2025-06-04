@@ -11,7 +11,7 @@ import loguru
 import diamond_shovel.plugins.load
 import diamond_shovel.plugins.manage
 from . import scheduler
-from .scheduler import CoroutineQueue, ShovelCoroutine
+from .scheduler import CoroutineQueue, ShovelCoroutine, CompletedShovelCoroutine
 from ..plugins import events, PluginInitContext, manage
 from ..utils.func import async_helper
 from ..utils.func.async_helper import call_async
@@ -210,6 +210,10 @@ class TaskContext:
                     async with scheduler.current_coroutine().unpark():
                         await scheduler.current_coroutine().wake_watchdog()
 
+                    # Here we enforce a different sleeping and waiting time
+                    # first plugin that awakened would stop collecting, and continue their jobs on current set of chunk
+                    # then it'll come back to collecting
+                    # rest plugins will continue waiting for their collection
                     if await events.wait_event(events.TaskWriteTriggerEvent,
                                                lambda evt: evt.key == key and evt.task_context == self, timeout=random.random() * 2 + 2) is None:
                         continue
@@ -235,6 +239,7 @@ class TaskContext:
                         retry_times = 0
                         results = []
 
+                # we're almost finished, yield reminders
                 for item in await self.get(key):
                     if item in selected:
                         continue
@@ -305,6 +310,22 @@ class TaskContext:
         :params worker: worker function
         """
         return all([filter0(owner, worker) for filter0 in self._worker_filters])
+
+    async def update(self, prev_worker_result: dict, prev_ctx: dict):
+        """
+        Update context with preset context
+        :params prev_worker_result: previous worker result
+        :params prev_ctx: previous context
+        """
+        if prev_worker_result is not None:
+            for worker_name, result in prev_worker_result.items():
+                self._worker_tasks.put(CompletedShovelCoroutine(worker_name, result))
+
+        if prev_ctx is not None:
+            for key, result in prev_ctx.items():
+                self._futures[key] = asyncio.get_running_loop().create_future()
+                self._futures[key].set_result(result)
+
 
 
 class ThreadLoguruHook(logging.Handler):

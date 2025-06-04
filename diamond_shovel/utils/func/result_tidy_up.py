@@ -15,10 +15,12 @@ def split_count(lst, count):
 def split_size(lst, size):
     return [lst[i:i + size] for i in range(0, len(lst), size)]
 
+
 def chained(func):
     def wrapper(target, *args, **kwargs):
         func(target, *args, **kwargs)
         return target
+
     return wrapper
 
 
@@ -26,6 +28,7 @@ builtins.dedup = dedup
 builtins.split_count = split_count
 builtins.split_size = split_size
 builtins.chained = chained
+
 
 def dedup_and_sort(func):
     @wraps(func)
@@ -80,8 +83,10 @@ def example_int_return_with_decorator():
 def example_str_return_with_decorator():
     return 'abc'
 
+
 def example_kv_return():
     return {'a': 1, 'b': 2, 'c': 1, 'd': 2}
+
 
 @dedup_and_sort
 def example_kv_return_with_decorator():
