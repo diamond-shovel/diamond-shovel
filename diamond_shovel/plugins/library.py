@@ -41,7 +41,8 @@ def initalize_pip_options(options):
     cfg: ConfigParser = di['config']
     options.index_url = cfg.get('plugin', 'library-index')
 
-    options.extra_index_urls = ["https://pypi.org/simple"]
+    # options.extra_index_urls = ["https://pypi.org/simple"]
+    options.extra_index_urls = []
     options.no_index = False
     options.constraints = options.editables = options.requirements = []
     options.use_pep517 = None
