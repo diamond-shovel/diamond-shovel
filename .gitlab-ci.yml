@@ -9,7 +9,7 @@ build:
   stage: build
   image: gitlab.cyberspike.top:5050/docker/python:3.13.3
   script:
-    - sed -i 's|http://deb.debian.org/debian|http://mirrors.huaweicloud.com/debian|g; s|http://deb.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g' /etc/apt/sources.list.d/debian.sources && apt-get update && apt-get install -y patchelf
+    - sed -i 's|http://deb.debian.org/debian|http://mirrors.huaweicloud.com/debian|g; s|http://deb.debian.org/debian-security|http://mirrors.huaweicloud.com/debian-security|g' /etc/apt/sources.list.d/debian.sources && apt-get update && apt-get install -y patchelf
     - pip config set global.index-url https://mirrors.huaweicloud.com/repository/pypi/simple
     - pip install build
     - python -m build --wheel
@@ -47,7 +47,7 @@ release-to-pypi:
   stage: release
   image: gitlab.cyberspike.top:5050/docker/python:3.13.3
   script:
-    - sed -i 's|http://deb.debian.org/debian|http://mirrors.huaweicloud.com/debian|g; s|http://deb.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g' /etc/apt/sources.list.d/debian.sources && apt-get update && apt-get install -y patchelf
+    - sed -i 's|http://deb.debian.org/debian|http://mirrors.huaweicloud.com/debian|g; s|http://deb.debian.org/debian-security|http://mirrors.huaweicloud.com/debian-security|g' /etc/apt/sources.list.d/debian.sources && apt-get update && apt-get install -y patchelf
     - pip config set global.index-url https://mirrors.huaweicloud.com/repository/pypi/simple
     - pip install build
     - python -m build --wheel
@@ -57,7 +57,7 @@ release-to-pypi:
   tags:
     - docker
   rules:
-    - if: $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_TAG
+    - if: $CI_COMMIT_TAG != null
 
 trigger:
   stage: trigger
