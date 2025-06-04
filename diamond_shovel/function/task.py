@@ -43,24 +43,24 @@ def concat_worker_name(plugin_name, worker_name):
 
 class TaskContext:
     def __init__(self):
-        self.__futures__: dict[str, Future[Any]] = {}
-        self.__finished_plugins__: dict[str, Future[Any]] = {}
-        self.__worker_tasks__: CoroutineQueue | None = None
-        self.__plugin_config__ = {}
-        self.__log__ = []
-        self.__worker_filters__ = []
+        self._futures: dict[str, Future[Any]] = {}
+        self._finished_plugins: dict[str, Future[Any]] = {}
+        self._worker_tasks: CoroutineQueue | None = None
+        self._plugin_config = {}
+        self._log = []
+        self._worker_filters = []
 
     def start(self, workers):
         """
         Bootstraps task context with workers
         :params workers: workers to bootstrap with
         """
-        if self.__worker_tasks__ is not None:
+        if self._worker_tasks is not None:
             raise Exception("Task already started.")
-        self.__worker_tasks__ = workers
+        self._worker_tasks = workers
 
     def __list__(self):
-        return self.__futures__.keys()
+        return self._futures.keys()
 
     async def get(self, name: str):
         """
@@ -68,17 +68,17 @@ class TaskContext:
         Fires a `TaskReadTriggerEvent` and the result can be altered.
         :params name: key name
         """
-        if name not in self.__futures__ or (self.__futures__[name].done() and await self.__futures__[name] is None):
+        if name not in self._futures or (self._futures[name].done() and await self._futures[name] is None):
             logging.debug(f"Reset {name} for {current_task(asyncio.get_running_loop())}")
             loop = asyncio.get_running_loop()
-            self.__futures__[name] = loop.create_future()
+            self._futures[name] = loop.create_future()
 
         # Avoid accidentally uncontrolled modification. Their modification must fire an event.
         if scheduler.current_coroutine().waiting:
-            value = copy.deepcopy(await self.__futures__[name])
+            value = copy.deepcopy(await self._futures[name])
         else:
             async with scheduler.current_coroutine().park(f"ctx[{name}]"):
-                value = copy.deepcopy(await self.__futures__[name])
+                value = copy.deepcopy(await self._futures[name])
         evt = events.TaskReadTriggerEvent(self, name, value)
         await async_helper.call_sync(events.call_event, evt)
 
@@ -94,17 +94,17 @@ class TaskContext:
         loop = asyncio.get_running_loop()
 
         old_value = None
-        if name in self.__futures__ and self.__futures__[name].done():
-            old_value = self.__futures__[name].result()
+        if name in self._futures and self._futures[name].done():
+            old_value = self._futures[name].result()
 
         evt = events.TaskWriteTriggerEvent(self, name, result, old_value)
         await async_helper.call_sync(events.call_event, evt)
-        if name not in self.__futures__ or self.__futures__[name].done():
-            self.__futures__[name] = loop.create_future()
+        if name not in self._futures or self._futures[name].done():
+            self._futures[name] = loop.create_future()
         if evt.value is None:
             raise ValueError(f"Cannot set {name} to None")
 
-        self.__futures__[name].set_result(evt.value)
+        self._futures[name].set_result(evt.value)
 
     @async_helper.disallows_direct_async
     def __getitem__(self, item):
@@ -119,15 +119,15 @@ class TaskContext:
         Fetches a copy of context values
         :returns: a list of tuples that formatted with key and value.
         """
-        return [(key, values) for key, values in self.__futures__.items() if values.done()]
+        return [(key, values) for key, values in self._futures.items() if values.done()]
 
     def __iter__(self):
         for key, values in self.items():
             yield key, values
 
     def __contains__(self, item):
-        return (item in self.__futures__ and self.__futures__[item].done() and
-                self.__futures__[item].result() is not None)
+        return (item in self._futures and self._futures[item].done() and
+                self._futures[item].result() is not None)
 
     async def operate(self, key, func, *args, **kwargs):
         """
@@ -158,13 +158,13 @@ class TaskContext:
         if plugin_name not in diamond_shovel.plugins.manage.plugin_table:
             return None
 
-        if concat_worker_name(plugin_name, worker_name) not in self.__finished_plugins__:
+        if concat_worker_name(plugin_name, worker_name) not in self._finished_plugins:
             loop = asyncio.get_running_loop()
-            self.__finished_plugins__[concat_worker_name(plugin_name, worker_name)] = loop.create_future()
+            self._finished_plugins[concat_worker_name(plugin_name, worker_name)] = loop.create_future()
 
         async with scheduler.current_coroutine().park(f"ctx.get_worker_result({plugin_name}, {worker_name})"):
             try:
-                return await self.__worker_tasks__[concat_worker_name(plugin_name, worker_name)].get_result()
+                return await self._worker_tasks[concat_worker_name(plugin_name, worker_name)].get_result()
             except Exception as e:
                 raise UnsatisfiedDependencyException(plugin_name, worker_name) from e
 
@@ -176,10 +176,10 @@ class TaskContext:
         Should not be called from a plugin, it will be called internally
         :returns: all results, but None if not even started
         """
-        if self.__worker_tasks__ is None:
+        if self._worker_tasks is None:
             return None
 
-        return await self.__worker_tasks__.run()
+        return await self._worker_tasks.run()
 
     async def get_remaining_workers(self, ignore_self=False):
         """
@@ -187,7 +187,7 @@ class TaskContext:
         :params ignore_self: whether to ignore the caller worker.
         :returns: all the workers that haven't done their jobs
         """
-        return [name for name, worker in self.__worker_tasks__.items() if
+        return [name for name, worker in self._worker_tasks.items() if
                 worker.running and (not ignore_self or worker != scheduler.current_coroutine())]
 
     async def collect(self, key, size=10):
@@ -257,37 +257,37 @@ class TaskContext:
         logging.debug(f"Finished collecting {key}")
 
     def __repr__(self):
-        return f"TaskContext(futures={{{self.__futures__}}}, finished_plugins={{{self.__finished_plugins__}}})"
+        return f"TaskContext(futures={{{self._futures}}}, finished_plugins={{{self._finished_plugins}}})"
 
     def get_plugin_config(self, plugin_name):
         """
         Reads config of a plugin, espically set for current task
         :params plugin_name: name of plugin
         """
-        if plugin_name not in self.__plugin_config__:
-            self.__plugin_config__[plugin_name] = {}
+        if plugin_name not in self._plugin_config:
+            self._plugin_config[plugin_name] = {}
 
-        return self.__plugin_config__[plugin_name]
+        return self._plugin_config[plugin_name]
 
     def set_plugin_config(self, plugin_name, config):
-        if plugin_name not in self.__plugin_config__:
-            self.__plugin_config__[plugin_name] = {}
+        if plugin_name not in self._plugin_config:
+            self._plugin_config[plugin_name] = {}
 
-        self.__plugin_config__[plugin_name].update(config)
+        self._plugin_config[plugin_name].update(config)
 
     def log(self, msg):
         """
         Logs a message to current context
         :params msg: log message
         """
-        self.__log__.append(msg)
+        self._log.append(msg)
 
     def get_log(self):
         """
         Reads all the log in current context
         :returns: the log
         """
-        return self.__log__
+        return self._log
 
     def add_worker_filter(self,
                           predicate: Callable[[PluginInitContext,
@@ -296,7 +296,7 @@ class TaskContext:
         Append a filter to worker, only the worker passes all the filters can be applied to this task context
         :params predicate: predicate function, true if the worker is accepted
         """
-        self.__worker_filters__.append(predicate)
+        self._worker_filters.append(predicate)
 
     def filter_worker(self, owner: PluginInitContext, worker: Callable[['TaskContext'], Coroutine[Any, Any, Any]]) -> bool:
         """
@@ -304,7 +304,7 @@ class TaskContext:
         :params owner: worker owner
         :params worker: worker function
         """
-        return all([filter0(owner, worker) for filter0 in self.__worker_filters__])
+        return all([filter0(owner, worker) for filter0 in self._worker_filters])
 
 
 class ThreadLoguruHook(logging.Handler):

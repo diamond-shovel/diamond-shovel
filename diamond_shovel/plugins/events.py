@@ -1,5 +1,5 @@
-__event_handlers__ = {}
-__event_futures__ = {}
+_event_handlers = {}
+_event_futures = {}
 
 import asyncio
 
@@ -106,11 +106,11 @@ def register_event(init_ctx, evt_class, handler):
     """
     if not issubclass(evt_class, Event):
         raise TypeError("evt_class must be a subclass of Event")
-    if evt_class not in __event_handlers__:
-        __event_handlers__[evt_class] = {}
-    if init_ctx not in __event_handlers__[evt_class]:
-        __event_handlers__[evt_class][init_ctx] = []
-    __event_handlers__[evt_class][init_ctx].append(handler)
+    if evt_class not in _event_handlers:
+        _event_handlers[evt_class] = {}
+    if init_ctx not in _event_handlers[evt_class]:
+        _event_handlers[evt_class][init_ctx] = []
+    _event_handlers[evt_class][init_ctx].append(handler)
 
 
 @async_helper.disallows_direct_async
@@ -121,9 +121,9 @@ def call_event(evt):
     """
     if not isinstance(evt, Event):
         raise TypeError("evt must be an instance of Event")
-    if evt.__class__ not in __event_handlers__:
+    if evt.__class__ not in _event_handlers:
         return
-    for init_ctx, handlers in __event_handlers__[evt.__class__].items():
+    for init_ctx, handlers in _event_handlers[evt.__class__].items():
         if not is_plugin_enabled(init_ctx.plugin_name):
             continue
         with init_ctx.attach():
@@ -132,8 +132,8 @@ def call_event(evt):
                 if asyncio.iscoroutine(handle_result):
                     async_helper.call_async(handle_result)
 
-    if evt.__class__ in __event_futures__:
-        for future in __event_futures__[evt.__class__]:
+    if evt.__class__ in _event_futures:
+        for future in _event_futures[evt.__class__]:
             future.set_result(evt)
 
 
@@ -148,11 +148,11 @@ async def wait_event(evt_class, evt_filter = lambda evt: True, timeout = 2147483
 
     while True:
         future = loop.create_future()
-        if evt_class not in __event_futures__:
-            __event_futures__[evt_class] = []
+        if evt_class not in _event_futures:
+            _event_futures[evt_class] = []
 
-        __event_futures__[evt_class].append(future)
+        _event_futures[evt_class].append(future)
         evt = await timed_await(future, timeout)
-        __event_futures__[evt_class].remove(future)
+        _event_futures[evt_class].remove(future)
         if evt is None or evt_filter(evt):
             return evt

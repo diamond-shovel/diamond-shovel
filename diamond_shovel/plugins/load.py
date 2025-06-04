@@ -35,18 +35,18 @@ class PluginInitContext:
     def __init__(self, plugin_name, archive: tarfile.TarFile, run_context: dict[str, typing.Any],
                  data_path: pathlib.Path):
         self.plugin_name = plugin_name
-        self.__data_folder__ = data_path / "plugins" / plugin_name
-        self.__config_overrider__ = []
+        self._data_folder = data_path / "plugins" / plugin_name
+        self._config_overrider = []
 
-        self.__config_file__ = self.__data_folder__ / "config.ini"
-        self.__run_context__ = run_context
-        self.__archive__ = archive
+        self._config_file = self._data_folder / "config.ini"
+        self._run_context = run_context
+        self._archive = archive
 
-        self.__plugin_dependency_container__ = {}
+        self._plugin_dependency_container = {}
 
         self.setup_base_container()
 
-        self.__threaded_attached_modified_container__ = {}
+        self._threaded_attached_modified_container = {}
 
         # trigger config extraction
         _ = self.config
@@ -55,11 +55,11 @@ class PluginInitContext:
         """
         Initializes the dependency container of current plugin
         """
-        self.__plugin_dependency_container__[BinaryManager] = di[BinaryManager]
-        self.__plugin_dependency_container__[ConfigParser] = self.config
-        self.__plugin_dependency_container__["data_folder"] = self.data_folder
-        self.__plugin_dependency_container__[PluginInitContext] = self
-        self.__plugin_dependency_container__[ThreadPoolExecutor] = di[ThreadPoolExecutor]
+        self._plugin_dependency_container[BinaryManager] = di[BinaryManager]
+        self._plugin_dependency_container[ConfigParser] = self.config
+        self._plugin_dependency_container["data_folder"] = self.data_folder
+        self._plugin_dependency_container[PluginInitContext] = self
+        self._plugin_dependency_container[ThreadPoolExecutor] = di[ThreadPoolExecutor]
 
     @property
     def config(self) -> configparser.ConfigParser:
@@ -68,15 +68,15 @@ class PluginInitContext:
         """
         config = configparser.ConfigParser(interpolation=configparser.Interpolation())
 
-        if not self.__config_file__.exists():
-            self.__config_file__.parent.mkdir(parents=True, exist_ok=True)
-            if any([tarinfo for tarinfo in self.__archive__.getmembers() if tarinfo.name == 'config.ini']):
+        if not self._config_file.exists():
+            self._config_file.parent.mkdir(parents=True, exist_ok=True)
+            if any([tarinfo for tarinfo in self._archive.getmembers() if tarinfo.name == 'config.ini']):
                 self.extract_resource("config.ini")
-        if self.__config_file__.exists():
-            with open(self.__config_file__, "r") as f:
+        if self._config_file.exists():
+            with open(self._config_file, "r") as f:
                 config.read_file(f)
 
-        for overrider in reversed(self.__config_overrider__):
+        for overrider in reversed(self._config_overrider):
             for section, values in overrider.items():
                 if not config.has_section(section):
                     config.add_section(section)
@@ -92,16 +92,16 @@ class PluginInitContext:
         :params config: config to override
         """
         logging.debug(f"{self.plugin_name}'s config overridden by {config}")
-        self.__config_overrider__.append(config)
-        self.__plugin_dependency_container__[ConfigParser] = self.config # we need a refresh.
+        self._config_overrider.append(config)
+        self._plugin_dependency_container[ConfigParser] = self.config # we need a refresh.
         logging.debug(f"Current config: { {section: {key: value for key, value in self.config.items(section)} for section in self.config.sections()} }")
 
     def restore_config(self):
         """
         Restore all config to default
         """
-        self.__config_overrider__ = self.__config_overrider__[:-1]
-        self.__plugin_dependency_container__[ConfigParser] = self.config
+        self._config_overrider = self._config_overrider[:-1]
+        self._plugin_dependency_container[ConfigParser] = self.config
 
     @property
     def data_folder(self) -> pathlib.Path:
@@ -109,9 +109,9 @@ class PluginInitContext:
         Gets data folder
         :returns: the path to data folder
         """
-        if not self.__data_folder__.exists():
-            self.__data_folder__.mkdir(parents=True)
-        return self.__data_folder__
+        if not self._data_folder.exists():
+            self._data_folder.mkdir(parents=True)
+        return self._data_folder
 
     @contextmanager
     def open_resource(self, name: str) -> typing.Generator[io.IOBase, None, None]:
@@ -122,7 +122,7 @@ class PluginInitContext:
         """
         f = None
         try:
-            f = self.__archive__.extractfile(name)
+            f = self._archive.extractfile(name)
             yield f
         finally:
             if f:
@@ -151,20 +151,20 @@ class PluginInitContext:
         """
         if async_helper.is_current_async():
             current_thread = asyncio.get_running_loop()
-            container = self.__threaded_attached_modified_container__.get(current_thread)
+            container = self._threaded_attached_modified_container.get(current_thread)
         else:
             current_thread = threading.current_thread()
-            container = self.__threaded_attached_modified_container__.get(current_thread)
+            container = self._threaded_attached_modified_container.get(current_thread)
 
         if container is None:
             container = Container()
-            for key, values in self.__plugin_dependency_container__.items():
+            for key, values in self._plugin_dependency_container.items():
                 container[key] = values
 
         for key, values in extras.items():
             container[key] = values
 
-        self.__threaded_attached_modified_container__[current_thread] = container
+        self._threaded_attached_modified_container[current_thread] = container
 
         return container
 
@@ -189,15 +189,15 @@ class PluginModuleLoader(importlib.abc.Loader):
     Internal loader of plugins
     """
     def __init__(self, tar_file: tarfile.TarFile, plugin_name: str, plugin_ctx: PluginInitContext):
-        self.__tar_file__ = tar_file
-        self.__plugin_name__ = plugin_name
-        self.__ctx__ = plugin_ctx
+        self._tar_file = tar_file
+        self._plugin_name = plugin_name
+        self._ctx = plugin_ctx
 
-        self.__module_cache__ = {}
+        self._module_cache = {}
 
     def create_module(self, spec):
-        if spec.name in self.__module_cache__:
-            return self.__module_cache__[spec.name]
+        if spec.name in self._module_cache:
+            return self._module_cache[spec.name]
 
         module_path = self.find_module(spec.name)
         if module_path:
@@ -209,10 +209,10 @@ class PluginModuleLoader(importlib.abc.Loader):
 
     def find_module(self, fullname):
         extensions = [".py", ".pyc", ".pyo"]
-        file_name = fullname.replace(".", "/").replace(self.__plugin_name__ + "/", "")
+        file_name = fullname.replace(".", "/").replace(self._plugin_name + "/", "")
         for ext in extensions:
             try:
-                if self.__tar_file__.getmember(file_name + ext):
+                if self._tar_file.getmember(file_name + ext):
                     return file_name + ext
             except KeyError:
                 pass
@@ -225,11 +225,11 @@ class PluginModuleLoader(importlib.abc.Loader):
             find_module = self.find_module(module.__name__)
 
         if find_module:
-            with self.__tar_file__.extractfile(find_module) as f:
+            with self._tar_file.extractfile(find_module) as f:
                 code = f.read()
-            with self.__ctx__.attach():
+            with self._ctx.attach():
                 module.__dict__.update(
-                    {"plugin_context": self.__ctx__, "di": self.__ctx__.__plugin_dependency_container__})
+                    {"plugin_context": self._ctx, "di": self._ctx._plugin_dependency_container})
                 exec(code, module.__dict__)
 
     def load_module(self, fullname):
@@ -239,7 +239,7 @@ class PluginModuleLoader(importlib.abc.Loader):
             self.exec_module(module)
             return module
         else:
-            raise ModuleNotFoundError(fullname + ":" + self.__plugin_name__)
+            raise ModuleNotFoundError(fullname + ":" + self._plugin_name)
 
     @property
     def plugin_name(self):
@@ -247,7 +247,7 @@ class PluginModuleLoader(importlib.abc.Loader):
         Gets current plugin name
         :returns: current plugin name
         """
-        return self.__plugin_name__
+        return self._plugin_name
 
     def is_module_package(self, fullname):
         """
@@ -260,26 +260,26 @@ class PluginModuleLoader(importlib.abc.Loader):
 
 class PluginModuleFinder(importlib.abc.MetaPathFinder):
     def __init__(self, loader: PluginModuleLoader):
-        self.__loader__ = loader
+        self._loader = loader
 
     def find_spec(self, fullname, path, target=None):
         # Make them under namespace of plugin. we don't want module conflicts
-        if fullname == self.__loader__.plugin_name:
-            return importlib.machinery.ModuleSpec(fullname, self.__loader__,
+        if fullname == self._loader.plugin_name:
+            return importlib.machinery.ModuleSpec(fullname, self._loader,
                                                   is_package=True)
 
         request_stack = inspect.stack()[4]
         requester = inspect.stack()[4].frame.f_globals['__name__'].split('.')[0]
-        if request_stack.filename == '<string>' and requester != self.__loader__.plugin_name:
+        if request_stack.filename == '<string>' and requester != self._loader.plugin_name:
             return None
 
-        if not fullname.startswith(self.__loader__.plugin_name):
-            fullname = self.__loader__.plugin_name + "." + fullname
+        if not fullname.startswith(self._loader.plugin_name):
+            fullname = self._loader.plugin_name + "." + fullname
 
-        module_path = self.__loader__.find_module(fullname)
+        module_path = self._loader.find_module(fullname)
         if module_path:
-            return importlib.machinery.ModuleSpec(fullname, self.__loader__,
-                                                  is_package=self.__loader__.is_module_package(fullname))
+            return importlib.machinery.ModuleSpec(fullname, self._loader,
+                                                  is_package=self._loader.is_module_package(fullname))
 
 
 def load_plugin_tar(tar: tarfile.TarFile):
