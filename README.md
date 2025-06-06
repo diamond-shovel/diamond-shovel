@@ -2,7 +2,7 @@
 
 > 面向目标的自动化漏洞发现和渗透测试框架
 
-![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg?style=for-the-badge&logo=python)
+![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg?style=for-the-badge&logo=python)
 
 ## 简介
 
