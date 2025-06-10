@@ -199,7 +199,7 @@ class BinaryManager:
             binary['path'].chmod(0o755)
             logging.debug(f"权限设置成功: {binary['path']}")
         except Exception as e:
-            raise Exception(f"权限设置失败 {e}")
+            logging.warning(f"权限设置失败: {binary['path']}")
 
     async def execute_binary(self, *args, **kwargs):
         def executor():
