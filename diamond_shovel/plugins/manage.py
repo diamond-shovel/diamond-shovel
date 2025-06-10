@@ -2,7 +2,6 @@ import logging
 import pathlib
 import traceback
 
-import loguru
 from kink import inject
 
 from .load import load_plugin_plain, generate_enable_order
@@ -40,7 +39,7 @@ def load_plugins(data_path: pathlib.Path, whitelist: list[str] = None, blacklist
                 load_data['file'] = file
                 plugin_table[name] = load_data
         except Exception:
-            loguru.logger.error(f"Failed to load plugin {file}: {traceback.format_exc()}")
+            logging.error(f"Failed to load plugin {file}: {traceback.format_exc()}")
 
     enable_loaded_plugins(blacklist, whitelist)
 

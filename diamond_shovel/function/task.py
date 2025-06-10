@@ -6,12 +6,11 @@ import threading
 from asyncio import Future, current_task
 from typing import Callable, Any, Coroutine
 
-import loguru
-
 import diamond_shovel.plugins.load
 import diamond_shovel.plugins.manage
 from . import scheduler
 from .scheduler import CoroutineQueue, ShovelCoroutine
+from ..cli import historian
 from ..plugins import events, PluginInitContext, manage
 from ..utils.func import async_helper
 from ..utils.func.async_helper import call_async
@@ -307,19 +306,6 @@ class TaskContext:
         return all([filter0(owner, worker) for filter0 in self.__worker_filters__])
 
 
-class ThreadLoguruHook(logging.Handler):
-    def __init__(self, target_thread, cb):
-        super().__init__()
-        self._target_thread = target_thread
-        self._cb = cb
-
-    def filter(self, record):
-        return record.thread == self._target_thread
-
-    def emit(self, record):
-        self._cb(self.format(record))
-
-
 class WorkerPool:
     def __init__(self):
         self.__workers__: dict[
@@ -356,49 +342,45 @@ class WorkerPool:
                 for worker in workers]
 
     async def run_worker(self, ctx_target_companies: TaskContext | list[str], target_domains: list[str] = None,
-                         target_ips: list[str] = None, loguru_handler: Callable[[str], None] | None = None):
+                         target_ips: list[str] = None, log_callback: Callable[[str], None] | None = None):
         """
         Fire a task execution to target
         :params ctx_target_companies: context or target companies
         :params target_domains: target domains
         :params target_ips: target ips
-        :params loguru_handler: handler of logging, will be called on every log
+        :params log_callback: handler of logging, will be called on every log
         """
         ctx = ctx_target_companies \
             if isinstance(ctx_target_companies, TaskContext) \
             else await initialize_task_context(ctx_target_companies, target_domains, target_ips)
 
-        with loguru.logger.contextualize():
-            loguru_handler_id = None
-            if loguru_handler is not None:
-                current_thread = threading.current_thread()
+        log_handler = historian.ThreadContextLogHandler(threading.current_thread(),
+                                                        log_callback) if log_callback else None
+        try:
+            logging.getLogger().addHandler(log_handler) if log_handler else None
 
-                loguru_handler_id = loguru.logger.add(sink=ThreadLoguruHook(current_thread, loguru_handler))
-
-            try:
-                async with asyncio.TaskGroup() as tg:
-                    await async_helper.call_sync(events.call_event, events.TaskDispatchEvent(ctx))
-                    all_tasks = CoroutineQueue()
-                    for plugin_ctx, workers in self.__workers__.items():
-                        if not manage.is_plugin_enabled(plugin_ctx.plugin_name):
+            async with asyncio.TaskGroup() as tg:
+                await async_helper.call_sync(events.call_event, events.TaskDispatchEvent(ctx))
+                all_tasks = CoroutineQueue()
+                for plugin_ctx, workers in self.__workers__.items():
+                    if not manage.is_plugin_enabled(plugin_ctx.plugin_name):
+                        continue
+                    for worker, nice in workers:
+                        if not ctx.filter_worker(plugin_ctx, worker):
                             continue
-                        for worker, nice in workers:
-                            if not ctx.filter_worker(plugin_ctx, worker):
-                                continue
 
-                            logging.info(f"Dispatched worker {worker.__qualname__} for {plugin_ctx.plugin_name}")
-                            task = ShovelCoroutine(plugin_ctx, worker, ctx, tg, nice)
-                            all_tasks.put(task)
-                    ctx.start(all_tasks)
+                        logging.info(f"Dispatched worker {worker.__qualname__} for {plugin_ctx.plugin_name}")
+                        task = ShovelCoroutine(plugin_ctx, worker, ctx, tg, nice)
+                        all_tasks.put(task)
+                ctx.start(all_tasks)
 
-                    if all_tasks.size() == 0:
-                        logging.warning("No workers available.")
-                        return "No worker to run."
+                if all_tasks.size() == 0:
+                    logging.warning("No workers available.")
+                    return "No worker to run."
 
-                    return await ctx.get_all_results()
-            finally:
-                if loguru_handler_id is not None:
-                    loguru.logger.remove(loguru_handler_id)
+                return await ctx.get_all_results()
+        finally:
+            logging.getLogger().removeHandler(log_handler) if log_handler else None
 
 
 worker_pool = WorkerPool()

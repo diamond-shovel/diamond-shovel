@@ -1,7 +1,7 @@
 from functools import wraps
 
-import loguru
 import builtins
+import logging
 
 
 def dedup(lst):
@@ -89,17 +89,17 @@ def example_kv_return_with_decorator():
 
 
 if __name__ == '__main__':
-    loguru.logger.info(example_function_single_no_sort())
-    loguru.logger.info(example_function_multiple_no_sort())
-    loguru.logger.info('----以上为不排序的结果----')
-    loguru.logger.info(example_function_single())
-    loguru.logger.info(example_function_multiple())
-    loguru.logger.info('----以上为排序的结果----')
-    loguru.logger.info(example_int_return())
-    loguru.logger.info(example_str_return())
-    loguru.logger.info('----以上为不排序的结果----')
-    loguru.logger.info(example_int_return_with_decorator())
-    loguru.logger.info(example_str_return_with_decorator())
-    loguru.logger.info('----以上为排序的结果----')
-    loguru.logger.info(example_kv_return())
-    loguru.logger.info(example_kv_return_with_decorator())
+    logging.info(example_function_single_no_sort())
+    logging.info(example_function_multiple_no_sort())
+    logging.info('----以上为不排序的结果----')
+    logging.info(example_function_single())
+    logging.info(example_function_multiple())
+    logging.info('----以上为排序的结果----')
+    logging.info(example_int_return())
+    logging.info(example_str_return())
+    logging.info('----以上为不排序的结果----')
+    logging.info(example_int_return_with_decorator())
+    logging.info(example_str_return_with_decorator())
+    logging.info('----以上为排序的结果----')
+    logging.info(example_kv_return())
+    logging.info(example_kv_return_with_decorator())

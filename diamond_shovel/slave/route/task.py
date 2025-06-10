@@ -96,10 +96,11 @@ def start_task(scan_id: uuid.UUID):
 
     def log_hook(log):
         scan_session[scan_id]["log_lines"].put_nowait(log)
+        scan_session[scan_id]["ctx"].log(log)
 
     async def task_runner():
         try:
-            await workers.run_worker(scan_session[scan_id]["ctx"], loguru_handler=log_hook)
+            await workers.run_worker(scan_session[scan_id]["ctx"], log_callback=log_hook)
             scan_session[scan_id]["state"] = "finished"
             scan_session[scan_id]['log_lines'].shutdown(immediate=True)
         except:

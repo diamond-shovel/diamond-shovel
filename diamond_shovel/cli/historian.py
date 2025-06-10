@@ -32,16 +32,17 @@ class LenientFormatLogRecord(logging.LogRecord):
                 msg = msg.format(*self.args)
         return msg
 
-class TaskLoggingHandler(logging.Handler):
-    def __init__(self):
+class ThreadContextLogHandler(logging.Handler):
+    def __init__(self, target_thread, cb):
         super().__init__()
+        self._target_thread = target_thread
+        self._cb = cb
 
-    @inject
-    def emit(self, record, task: TaskContext = None):
-        if task is None:
-            return
-        msg = self.format(record)
-        task.log(msg)
+    def filter(self, record):
+        return record.thread == self._target_thread.ident
+
+    def emit(self, record):
+        self._cb(self.format(record))
 
 def find_issuing_plugin():
     for f in inspect.stack():
@@ -120,8 +121,4 @@ def setup_logger(config: ConfigParser = default_config):
 
     console.setFormatter(color_formatter)
     logging.root.addHandler(console)
-
-    task_handler = TaskLoggingHandler()
-    setattr(task_handler, 'shovel_attached', True)
-    logging.root.addHandler(task_handler)
 

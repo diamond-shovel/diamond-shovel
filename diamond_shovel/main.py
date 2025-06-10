@@ -9,7 +9,6 @@ import pwd
 import sys
 from concurrent.futures.thread import ThreadPoolExecutor
 
-import loguru
 from kink import di, inject
 
 import diamond_shovel.config
@@ -19,19 +18,6 @@ from diamond_shovel.cli import historian
 from diamond_shovel.function.binary_manager import BinaryManager
 from diamond_shovel.utils.func import json_util
 
-
-@inject
-def iter_plugin_files(data_path: pathlib.Path):
-    """
-    List all plugins in the data path
-    :param data_path: The data path
-    :return: A list of plugins,containing the plugin file path
-    """
-    plugin_path = data_path / "plugins"
-    loguru.logger.debug(f"Current plugins path:{plugin_path}")
-    if not plugin_path.exists():
-        return []
-    return [f for f in plugin_path.iterdir() if f.is_file() and (".tar" in f.suffixes or f.suffix == ".ore")]
 
 def main():
     diamond_shovel.utils.func.init()
@@ -167,7 +153,7 @@ def run_once(args, blacklist, whitelist):
             scan_result['deserialization_failure'] = e
             f.write(json.dumps(scan_result, indent=4, cls=json_util.ExceptionExtendedEncoder, skipkeys=True))
     out_json_abs_path = os.path.abspath(args.out_json)
-    loguru.logger.success(f"Output json file path: {out_json_abs_path}")
+    logging.info(f"Output json file path: {out_json_abs_path}")
 
     from diamond_shovel import privileged
     privileged.terminate()
