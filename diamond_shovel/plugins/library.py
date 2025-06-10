@@ -175,7 +175,7 @@ def refresh_python_libraries(data_path: pathlib.Path):
     importlib.invalidate_caches()
 
 
-def dispatch_python_wheel_decompress(file, target):
+def dispatch_python_wheel_decompress(file: pathlib.Path, target: pathlib.Path):
     """
     Dispatches decompression of a file, should be a python wheel
     :params file: file to decompress
@@ -188,6 +188,12 @@ def dispatch_python_wheel_decompress(file, target):
     elif suffix.endswith(".tar.gz"):
         with tarfile.open(file) as t:
             t.extractall(target)
+        # there might be nested things, we need to deal with them
+        sub_folder = target / file.name.replace('.tar.gz', '')
+        if sub_folder.exists():
+            for f in sub_folder.iterdir():
+                f.rename(target / f.name)
+            sub_folder.unlink()
     else:
         logging.error(f"Unknown file type {file.suffix}")
         return False
