@@ -131,3 +131,12 @@ async def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
 @router.get('/')
 def all_tasks():
     return list(scan_session.keys())
+
+@router.get('/{scan_id}/stop')
+def stop_task(scan_id: uuid.UUID):
+    if scan_id not in scan_session:
+        raise HTTPException(404, "Scan session not found")
+
+    scan_session[scan_id]["state"] = "finished"
+    scan_session[scan_id]['loop'].stop()
+    scan_session[scan_id]['log_lines'].shutdown(immediate=True)

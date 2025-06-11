@@ -2,6 +2,7 @@ import asyncio
 import functools
 import logging
 import threading
+import traceback
 from concurrent.futures.thread import ThreadPoolExecutor
 from threading import Condition
 from typing import Coroutine
@@ -88,8 +89,11 @@ def disallows_direct_async(func):
 def threaded_async_run(coro):
     loop = asyncio.new_event_loop()
     def new_threaded_event_loop():
-        asyncio.set_event_loop(loop)
-        asyncio.run(coro)
+        try:
+            asyncio.set_event_loop(loop)
+            asyncio.run(coro)
+        except RuntimeError:
+            logging.warning(f"Exception during running coroutine: {traceback.format_exc()}")
 
     pool.submit(new_threaded_event_loop)
     return loop
