@@ -3,6 +3,7 @@ import importlib
 import json
 import logging
 import pathlib
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -185,6 +186,7 @@ def dispatch_python_wheel_decompress(file: pathlib.Path, target: pathlib.Path):
     if suffix.endswith(".zip") or suffix.endswith(".whl"):
         with zipfile.ZipFile(file) as z:
             z.extractall(target)
+        return True
     elif suffix.endswith(".tar.gz"):
         with tarfile.open(file) as t:
             t.extractall(target)
@@ -193,7 +195,8 @@ def dispatch_python_wheel_decompress(file: pathlib.Path, target: pathlib.Path):
         if sub_folder.exists():
             for f in sub_folder.iterdir():
                 f.rename(target / f.name)
-            sub_folder.unlink()
+            shutil.rmtree(sub_folder)
+        return True
     else:
         logging.error(f"Unknown file type {file.suffix}")
         return False
