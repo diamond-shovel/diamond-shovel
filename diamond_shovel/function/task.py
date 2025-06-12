@@ -42,20 +42,22 @@ def concat_worker_name(plugin_name, worker_name):
 
 class TaskContext:
     def __init__(self):
-        self.__futures__: dict[str, Future[Any]] = {}
-        self.__finished_plugins__: dict[str, Future[Any]] = {}
         self.__worker_tasks__: CoroutineQueue | None = None
         self.__plugin_config__ = {}
-        self.__log__ = []
         self.__worker_filters__ = []
+        self._initialize_task()
+
+    def _initialize_task(self):
+        self.__futures__: dict[str, Future[Any]] = {}
+        self.__finished_plugins__: dict[str, Future[Any]] = {}
+        self.__log__ = []
 
     def start(self, workers):
         """
         Bootstraps task context with workers
         :params workers: workers to bootstrap with
         """
-        if self.__worker_tasks__ is not None:
-            raise Exception("Task already started.")
+        self._initialize_task()
         self.__worker_tasks__ = workers
 
     def __list__(self):
