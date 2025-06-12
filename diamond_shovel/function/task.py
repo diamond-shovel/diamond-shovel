@@ -245,22 +245,17 @@ class TaskContext:
                 retry_times += 1
                 results = []
         except asyncio.exceptions.CancelledError:
+            # wait for watchdog uncancels us
+            await asyncio.sleep(0.1)
             logging.debug(f"Got interrupted. exiting. already discovered {selected}")
-            try:
-                for item in await self.get(key):
-                    if item not in selected:
-                        selected.append(item)
-                        results.append(item)
-            except asyncio.exceptions.CancelledError: # second alarm, we should quit immediately.
-                logging.debug(f"Got interrupted again, stop collecting.")
-                pass
+            for item in await self.get(key):
+                if item not in selected:
+                    selected.append(item)
+                    results.append(item)
             if len(results) > 0:
                 yield results
 
         logging.debug(f"Finished collecting {key}")
-
-        # wait for watchdog uncancels us
-        await asyncio.sleep(0.1)
 
     def __repr__(self):
         return f"TaskContext(futures={{{self._futures}}}, finished_plugins={{{self._finished_plugins}}})"
