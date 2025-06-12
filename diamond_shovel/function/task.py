@@ -45,9 +45,6 @@ class TaskContext:
         self._plugin_config = {}
         self._worker_filters = []
         self._log_hooks = []
-        self._initialize_task()
-
-    def _initialize_task(self):
         self._futures: dict[str, Future[Any]] = {}
         self._finished_plugins: dict[str, Future[Any]] = {}
         self._log = []
@@ -57,7 +54,8 @@ class TaskContext:
         Bootstraps task context with workers
         :params workers: workers to bootstrap with
         """
-        self._initialize_task()
+        if self._worker_tasks is not None:
+            raise Exception("Task already started.")
         self._worker_tasks = workers
 
     def __list__(self):
@@ -69,7 +67,8 @@ class TaskContext:
         Fires a `TaskReadTriggerEvent` and the result can be altered.
         :params name: key name
         """
-        if name not in self._futures or (self._futures[name].done() and await self._futures[name] is None):
+        logging.debug(f'Getting {name} from {self}, future: {self._futures[name] if name in self._futures else None}')
+        if name not in self._futures or self._futures[name].cancelled() or (self._futures[name].done() and await self._futures[name] is None):
             logging.debug(f"Reset {name} for {current_task(asyncio.get_running_loop())}")
             loop = asyncio.get_running_loop()
             self._futures[name] = loop.create_future()
@@ -92,6 +91,8 @@ class TaskContext:
         :params name: key name
         :params result: the value to be set
         """
+        logging.debug(f"Setting {name} from {self}, future: {self._futures[name] if name in self._futures else None}, value: {result}")
+
         loop = asyncio.get_running_loop()
 
         old_value = None
@@ -248,17 +249,19 @@ class TaskContext:
             # wait for watchdog uncancels us
             await asyncio.sleep(0.1)
             logging.debug(f"Got interrupted. exiting. already discovered {selected}")
-            for item in await self.get(key):
-                if item not in selected:
-                    selected.append(item)
-                    results.append(item)
             if len(results) > 0:
                 yield results
+
+            # we need to restore the original value as the `future` used before was cancelled
+            # it is in an unreadable state, causing further issues
+            # `selected` collection is the full version of original value, we just set that back.
+            del self._futures[key]
+            await self.set(key, selected)
 
         logging.debug(f"Finished collecting {key}")
 
     def __repr__(self):
-        return f"TaskContext(futures={{{self._futures}}}, finished_plugins={{{self._finished_plugins}}})"
+        return f"TaskContext(futures={{{self._futures}}}, finished_plugins={{{self._finished_plugins}}}, hash={hash(self)})"
 
     def get_plugin_config(self, plugin_name):
         """

@@ -1,5 +1,4 @@
 import argparse
-import asyncio
 import json
 import logging
 import multiprocessing
@@ -9,7 +8,7 @@ import pwd
 import sys
 from concurrent.futures.thread import ThreadPoolExecutor
 
-from kink import di, inject
+from kink import di
 
 import diamond_shovel.config
 import diamond_shovel.slave.server
@@ -146,7 +145,7 @@ def run_once(args, blacklist, whitelist):
     merge_list(ctx, "target_ips", target_ips)
 
     with open(args.out_json, "w") as f:
-        scan_result = asyncio.run(task.run_full_scan(ctx))
+        scan_result = ctx.get_assigned_event_loop().run_until_complete(task.run_full_scan(ctx))
         try:
             f.write(json.dumps(scan_result, indent=4, cls=json_util.ExceptionExtendedEncoder))
         except Exception as e:

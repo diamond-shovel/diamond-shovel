@@ -237,9 +237,11 @@ class CoroutineQueue:
             await asyncio.sleep(1)
             if self._task_to_interrupt:
                 for task in self._task_to_interrupt:
+                    logging.debug(f'Executing interruption on task {task}')
                     task.cancel()
                     await asyncio.sleep(0.001)
                     task.uncancel()
+                    logging.debug(f'Interruption for task {task} finished')
                 self._task_to_interrupt.clear()
 
     def set_nice(self, name, nice):
