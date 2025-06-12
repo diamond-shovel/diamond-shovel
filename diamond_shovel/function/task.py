@@ -246,10 +246,14 @@ class TaskContext:
                 results = []
         except asyncio.exceptions.CancelledError:
             logging.debug(f"Got interrupted. exiting. already discovered {selected}")
-            for item in await self.get(key):
-                if item not in selected:
-                    selected.append(item)
-                    results.append(item)
+            try:
+                for item in await self.get(key):
+                    if item not in selected:
+                        selected.append(item)
+                        results.append(item)
+            except asyncio.exceptions.CancelledError: # second alarm, we should quit immediately.
+                logging.debug(f"Got interrupted again, stop collecting.")
+                pass
             if len(results) > 0:
                 yield results
 
