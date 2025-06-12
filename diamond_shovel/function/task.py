@@ -259,6 +259,9 @@ class TaskContext:
 
         logging.debug(f"Finished collecting {key}")
 
+        # wait for watchdog uncancels us
+        await asyncio.sleep(0.1)
+
     def __repr__(self):
         return f"TaskContext(futures={{{self._futures}}}, finished_plugins={{{self._finished_plugins}}})"
 
