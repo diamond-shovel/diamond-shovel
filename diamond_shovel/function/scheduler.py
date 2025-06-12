@@ -238,7 +238,7 @@ class CoroutineQueue:
             if self._task_to_interrupt:
                 for task in self._task_to_interrupt:
                     task.cancel()
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.001)
                     task.uncancel()
                 self._task_to_interrupt.clear()
 
