@@ -82,7 +82,7 @@ def disallows_direct_async(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         if is_current_async() and not getattr(local, 'from_async', False):
-            raise RuntimeError(f"Function {func.__name__} cannot be called directly from an async context. Please use `async_helper.call_async` instead.")
+            raise RuntimeError(f"Function {func.__name__} cannot be called directly from an async context. Please use `async_helper.call_sync` instead.")
         return func(*args, **kwargs)
     return wrapper
 

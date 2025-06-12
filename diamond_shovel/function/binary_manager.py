@@ -7,6 +7,7 @@ import threading
 import traceback
 from contextlib import contextmanager
 
+from diamond_shovel.cli import historian
 from diamond_shovel.utils.func import retry, async_helper
 
 metadata_file = 'BinaryMetadata.json'
@@ -202,8 +203,11 @@ class BinaryManager:
             logging.warning(f"权限设置失败: {binary['path']}")
 
     async def execute_binary(self, *args, **kwargs):
+        from diamond_shovel.function.task import current_task_context
+        ctx = current_task_context()
         def executor():
-            return self.execute_binary_sync(*args, **kwargs)
+            with historian.threaded_context_handler(ctx):
+                return self.execute_binary_sync(*args, **kwargs)
 
         return await async_helper.call_sync(executor)
 

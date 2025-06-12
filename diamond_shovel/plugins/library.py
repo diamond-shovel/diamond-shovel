@@ -132,7 +132,7 @@ class PythonLibDownloader(RequirementCommand):
         return downloaded
 
 
-__check_passed__ = []
+_check_passed = []
 
 @inject
 def fetch_python_library(name, data_path: pathlib.Path):

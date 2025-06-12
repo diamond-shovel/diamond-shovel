@@ -181,8 +181,8 @@ def current_coroutine(loop=None) -> ShovelCoroutine:
 
 class CoroutineQueue:
     def __init__(self):
-        self._queue_: PriorityQueue[tuple[int, ShovelCoroutine]] = PriorityQueue()
-        self._name_map_: dict[str, ShovelCoroutine] = {}
+        self._queue: PriorityQueue[tuple[int, ShovelCoroutine]] = PriorityQueue()
+        self._name_map: dict[str, ShovelCoroutine] = {}
         self._task_group = TaskGroup()
         self._watchdog_alarm = threading.Event()
         self._task_to_interrupt = []
@@ -193,8 +193,8 @@ class CoroutineQueue:
         :params item: the coroutine
         :params nice: the nice value
         """
-        self._queue_.put_nowait((nice, item))
-        self._name_map_[item._name] = item
+        self._queue.put_nowait((nice, item))
+        self._name_map[item._name] = item
 
     async def run(self):
         """
@@ -204,12 +204,12 @@ class CoroutineQueue:
         task_set = []
 
         def complete(_):
-            done_task_count = len([item for item in self._name_map_.values() if item.done])
-            total_task_count = len(self._name_map_)
+            done_task_count = len([item for item in self._name_map.values() if item.done])
+            total_task_count = len(self._name_map)
             print(f"{{{{plugin_progress: {float(done_task_count / total_task_count)} }}}}")
 
-        while not self._queue_.empty():
-            _, item = self._queue_.get_nowait()
+        while not self._queue.empty():
+            _, item = self._queue.get_nowait()
             task_set.append(item.as_task(complete, self))
         threading.Thread(target=self.watchdog, args=(task_set, asyncio.get_running_loop())).start()
         await asyncio.gather(self.check_interrupt(task_set), *task_set)
@@ -220,7 +220,7 @@ class CoroutineQueue:
             except Exception as e:
                 return e
 
-        return {item._name: await collect(item) for item in self._name_map_.values()}
+        return {item._name: await collect(item) for item in self._name_map.values()}
 
     async def alarm_watchdog(self):
         """
@@ -248,11 +248,11 @@ class CoroutineQueue:
         :params name: target coroutine
         :params nice: new nice value
         """
-        item = self._name_map_[name]
-        for qitem in self._queue_.queue:
+        item = self._name_map[name]
+        for qitem in self._queue.queue:
             if qitem[1] == item:
-                self._queue_.queue.remove(qitem)
-                self._queue_.put_nowait((nice, item))
+                self._queue.queue.remove(qitem)
+                self._queue.put_nowait((nice, item))
                 return
         self.put(item, nice)
 
@@ -295,7 +295,7 @@ class CoroutineQueue:
         remaining = async_helper.run_async(ctx.get_remaining_workers(ignore_self=True))
         logging.debug(f"Running tasks ({len(remaining)} remains)")
         logging.debug("-" * 50)
-        [logging.debug(f"{name}: {self._name_map_[name]}") for name in remaining]
+        [logging.debug(f"{name}: {self._name_map[name]}") for name in remaining]
         logging.debug("-" * 50)
         curr = asyncio.current_task(loop)
         if curr is None:
@@ -312,8 +312,8 @@ class CoroutineQueue:
         :params name: target coroutine
         :returns: the nice value, None if not found
         """
-        item = self._name_map_[name]
-        for qitem in self._queue_.queue:
+        item = self._name_map[name]
+        for qitem in self._queue.queue:
             if qitem[1] == item:
                 return qitem[0]
         return None
@@ -323,14 +323,14 @@ class CoroutineQueue:
         Removes a coroutine from queue
         :params name: target coroutine
         """
-        item = self._name_map_[name]
+        item = self._name_map[name]
         if item is None:
             raise ValueError("item not found")
-        for qitem in self._queue_.queue:
+        for qitem in self._queue.queue:
             if qitem[1] == item:
-                self._queue_.queue.remove(qitem)
+                self._queue.queue.remove(qitem)
                 return
-        self._name_map_.pop(name)
+        self._name_map.pop(name)
         raise ValueError("item not found")
 
     def size(self):
@@ -338,24 +338,24 @@ class CoroutineQueue:
         Gets the queue size
         :returns: the queue size
         """
-        return self._queue_.qsize()
+        return self._queue.qsize()
 
     def items(self):
         """
         Gets everything from the queue
         :returns: the list tuples of name, coroutine
         """
-        return self._name_map_.items()
+        return self._name_map.items()
 
     def values(self):
         """
         Gets every coroutine from the queue
         :returns: the coroutine list
         """
-        return self._name_map_.values()
+        return self._name_map.values()
 
     def __getitem__(self, item):
-        return self._name_map_[item]
+        return self._name_map[item]
 
     def __len__(self):
-        return len(self._name_map_)
+        return len(self._name_map)

@@ -1,4 +1,4 @@
-__event_handlers__ = {}
+_event_handlers = {}
 __event_futures__ = {}
 
 import asyncio
@@ -106,11 +106,11 @@ def register_event(init_ctx, evt_class, handler):
     """
     if not issubclass(evt_class, Event):
         raise TypeError("evt_class must be a subclass of Event")
-    if evt_class not in __event_handlers__:
-        __event_handlers__[evt_class] = {}
-    if init_ctx not in __event_handlers__[evt_class]:
-        __event_handlers__[evt_class][init_ctx] = []
-    __event_handlers__[evt_class][init_ctx].append(handler)
+    if evt_class not in _event_handlers:
+        _event_handlers[evt_class] = {}
+    if init_ctx not in _event_handlers[evt_class]:
+        _event_handlers[evt_class][init_ctx] = []
+    _event_handlers[evt_class][init_ctx].append(handler)
 
 
 @async_helper.disallows_direct_async
@@ -121,9 +121,9 @@ def call_event(evt):
     """
     if not isinstance(evt, Event):
         raise TypeError("evt must be an instance of Event")
-    if evt.__class__ not in __event_handlers__:
+    if evt.__class__ not in _event_handlers:
         return
-    for init_ctx, handlers in __event_handlers__[evt.__class__].items():
+    for init_ctx, handlers in _event_handlers[evt.__class__].items():
         if not is_plugin_enabled(init_ctx.plugin_name):
             continue
         with init_ctx.attach():

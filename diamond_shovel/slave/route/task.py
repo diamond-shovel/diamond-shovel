@@ -94,13 +94,13 @@ def start_task(scan_id: uuid.UUID):
     if scan_id not in scan_session:
         raise HTTPException(404, "Scan session not found")
 
-    def log_hook(log):
-        scan_session[scan_id]["log_lines"].put_nowait(log)
-        scan_session[scan_id]["ctx"].log(log)
+    def log_hook(log_line):
+        scan_session[scan_id]["log_lines"].put_nowait(log_line)
 
     async def task_runner():
         try:
-            await workers.run_worker(scan_session[scan_id]["ctx"], log_callback=log_hook)
+            scan_session[scan_id]['ctx']._log_hooks.append(log_hook)
+            await workers.run_worker(scan_session[scan_id]["ctx"])
             scan_session[scan_id]["state"] = "finished"
             scan_session[scan_id]['log_lines'].shutdown(immediate=True)
         except:
