@@ -54,10 +54,9 @@ class ShovelCoroutine:
         finally:
             self._owner.restore_config()
 
-    def as_task(self, on_complete, scheduler):
+    def as_task(self, scheduler):
         """
         Starts the coroutine as an async task
-        :params on_complete: callback of completion
         :params scheduler: the scheduler
         """
         if self._task is None:
@@ -72,7 +71,6 @@ class ShovelCoroutine:
                     with self._attach():
                         self._result.set_result(await self._coro(self.ctx))
                     logging.info(f"{self._name} has finished running")
-                    on_complete(self)
                     self._running_schedulers.remove(scheduler)
                 except Exception as e:
                     self._result.set_exception(e)
@@ -203,14 +201,9 @@ class CoroutineQueue:
         """
         task_set = []
 
-        def complete(_):
-            done_task_count = len([item for item in self._name_map.values() if item.done])
-            total_task_count = len(self._name_map)
-            print(f"{{{{plugin_progress: {float(done_task_count / total_task_count)} }}}}")
-
         while not self._queue.empty():
             _, item = self._queue.get_nowait()
-            task_set.append(item.as_task(complete, self))
+            task_set.append(item.as_task(self))
         threading.Thread(target=self.watchdog, args=(task_set, asyncio.get_running_loop())).start()
         await asyncio.gather(self.check_interrupt(task_set), *task_set)
 

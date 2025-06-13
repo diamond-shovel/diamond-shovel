@@ -39,14 +39,14 @@ class LenientFormatLogRecord(logging.LogRecord):
 class ThreadedTaskContextLogHandler(logging.Handler):
     def __init__(self, ctx):
         super().__init__()
-        self._ctx = ctx
+        self.ctx = ctx
         self._target_thread = threading.current_thread()
 
     def filter(self, record):
         return record.thread == self._target_thread.ident
 
     def emit(self, record):
-        self._ctx.log(self.format(record))
+        self.ctx.log(self.format(record))
 
 
 class TaskContextLogHandler(logging.Handler):
@@ -166,3 +166,24 @@ def threaded_context_handler(ctx):
     finally:
         if handler is not None:
             remove_handler(handler)
+
+
+@contextlib.contextmanager
+def duplicate_threaded_context_handler(prev):
+    handler = None
+    if prev is not None:
+        handler = ThreadedTaskContextLogHandler(prev.ctx)
+        put_handler(handler)
+
+    try:
+        yield
+    finally:
+        if handler is not None:
+            remove_handler(handler)
+
+
+def get_current_thread_handler():
+    for handler in logging.root.handlers:
+        if isinstance(handler, ThreadedTaskContextLogHandler):
+            if handler._target_thread == threading.current_thread():
+                return handler

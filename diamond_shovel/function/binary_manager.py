@@ -20,20 +20,22 @@ def print_from_process_stream(process: subprocess.Popen, log_prefix, output_cont
     :param log_prefix: Prefix for logging
     :param output_container: Dictionary to collect stdout and stderr
     """
+    handler = historian.get_current_thread_handler()
 
     def read_stream(stream, key):
-        while True:
-            try:
-                line = stream.readline()
-                if not line:
+        with historian.duplicate_threaded_context_handler(handler):
+            while True:
+                try:
+                    line = stream.readline()
+                    if not line:
+                        break
+                    logging.info(f"{log_prefix}: {line.strip()}")
+                    output_container[key].append(line)
+                except UnicodeDecodeError:
+                    logging.warning(f"{log_prefix}: Decode fail: {traceback.format_exc()}")
+                except ValueError:
+                    # Stream has been closed
                     break
-                logging.debug(f"{log_prefix}: {line.strip()}")
-                output_container[key].append(line)
-            except UnicodeDecodeError:
-                logging.debug(f"{log_prefix}: Decode fail: {traceback.format_exc()}")
-            except ValueError:
-                # Stream has been closed
-                break
 
     threads = []
     output_container['stdout'] = []
@@ -228,7 +230,7 @@ class BinaryManager:
         binary = self.binary_path_list[name]
 
         full_cmd = [str(binary['path'])] + cmd_args
-        logging.debug(f"执行系统命令: {' '.join(full_cmd)}在{binary['out']}")
+        logging.info(f"在 `{binary['out']}` 执行系统命令: `{' '.join(full_cmd)}`")
         process = subprocess.Popen(full_cmd, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE if separate_output else subprocess.STDOUT, bufsize=1,
                                    text=text, cwd=str(binary['out']))
@@ -263,7 +265,12 @@ class BinaryManager:
         return stdout, stderr
 
     def start_stdio_agent(self, full_cmd, output_container, process):
-        print_thread = threading.Thread(target=print_from_process_stream, args=(process, full_cmd[0], output_container))
+        handler = historian.get_current_thread_handler()
+        def print_wrapper(*args):
+            with historian.duplicate_threaded_context_handler(handler):
+                print_from_process_stream(*args)
+
+        print_thread = threading.Thread(target=print_wrapper, args=(process, full_cmd[0], output_container))
         print_thread.start()
         return print_thread
 

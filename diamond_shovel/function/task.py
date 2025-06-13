@@ -439,4 +439,10 @@ def current_task_context() -> TaskContext | None:
     for frame in stack:
         if frame.function == "run_worker":
             return frame.frame.f_locals['ctx']
+        if frame.function == "run":
+            # maybe at scheduler.py#L73
+            if 'self' in frame.frame.f_locals:
+                result = getattr(frame.frame.f_locals['self'], 'ctx', None)
+                if result is not None:
+                    return result
     return None
