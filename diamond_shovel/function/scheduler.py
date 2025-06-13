@@ -144,6 +144,16 @@ class ShovelCoroutine:
             return False
         return self._task.done()
 
+    @property
+    def park_reason(self):
+        return self._park_reason
+
+    @property
+    def cancelled(self):
+        if self._task is None:
+            return False
+        return self._task.cancelled()
+
     async def get_result(self):
         """
         Reads result of current coroutine
@@ -287,7 +297,7 @@ class CoroutineQueue:
             logging.debug(f"{coroutine_wrapper_mapping[task]._name}: {coroutine_wrapper_mapping[task]}")
             ctx = coroutine_wrapper_mapping[task].ctx
         logging.debug("-" * 50)
-        remaining = async_helper.run_async(ctx.get_remaining_workers(ignore_self=True))
+        remaining = async_helper.run_async(ctx._get_remaining_workers(ignore_self=True))
         logging.debug(f"Running tasks ({len(remaining)} remains)")
         logging.debug("-" * 50)
         [logging.debug(f"{name}: {self._name_map[name]}") for name in remaining]

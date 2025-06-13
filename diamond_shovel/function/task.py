@@ -181,7 +181,7 @@ class TaskContext:
 
         return await self._worker_tasks.run()
 
-    async def get_remaining_workers(self, ignore_self=False):
+    async def _get_remaining_workers(self, ignore_self=False):
         """
         Fetches workers that haven't done their jobs, usually used internally for worker communication
         :params ignore_self: whether to ignore the caller worker.
@@ -189,6 +189,9 @@ class TaskContext:
         """
         return [name for name, worker in self._worker_tasks.items() if
                 worker.running and (not ignore_self or worker != scheduler.current_coroutine())]
+
+    def get_worker_queue(self):
+        return self._worker_tasks
 
     async def collect(self, key, size=10):
         """
@@ -202,8 +205,8 @@ class TaskContext:
         retry_times = 0
         try:
             async with scheduler.current_coroutine().park(f"ctx.collect({key})"):
-                logging.debug(f"Checking remaining workers: {await self.get_remaining_workers(ignore_self=True)}")
-                while len(await self.get_remaining_workers(ignore_self=True)) > 0:
+                logging.debug(f"Checking remaining workers: {await self._get_remaining_workers(ignore_self=True)}")
+                while len(await self._get_remaining_workers(ignore_self=True)) > 0:
                     logging.debug(f"Collecting {key} for {retry_times} times, {scheduler.current_coroutine()}")
                     retry_times += 1
 

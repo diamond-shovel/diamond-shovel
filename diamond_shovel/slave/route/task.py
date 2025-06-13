@@ -95,7 +95,18 @@ def start_task(scan_id: uuid.UUID):
         raise HTTPException(404, "Scan session not found")
 
     def log_hook(log_line):
-        scan_session[scan_id]["log_lines"].put_nowait(log_line)
+        coroutine_data = {
+            name: {
+                'waiting': coro.park_reason,
+                'done': coro.done,
+                'cancelled': coro.cancelled,
+            } for name, coro in scan_session[scan_id]["ctx"].get_worker_queue().items()
+        } if scan_session[scan_id]["ctx"].get_worker_queue() else {}
+
+        scan_session[scan_id]["log_lines"].put_nowait({
+            'log': log_line,
+            'coroutines': coroutine_data
+        })
 
     async def task_runner():
         try:
@@ -119,7 +130,8 @@ async def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
 
     while scan_session[scan_id]["state"] == "running":
         try:
-            await websocket.send_json({'action': 'log', 'body': await scan_session[scan_id]["log_lines"].get()})
+            log_data = await scan_session[scan_id]["log_lines"].get()
+            await websocket.send_json({'action': 'log', 'body': log_data['log'], 'coroutines': log_data['coroutines']})
         except asyncio.queues.QueueShutDown:
             pass
 
