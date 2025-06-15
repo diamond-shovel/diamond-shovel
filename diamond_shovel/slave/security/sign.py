@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import pathlib
+import random
 import struct
 from typing import Annotated
 
@@ -16,7 +17,10 @@ from fastapi.params import Header
 from kink import inject
 
 _private_key: ec.EllipticCurvePrivateKey
-_peer_keys: dict[str, tuple[ec.EllipticCurvePublicKey, int, int]] = {}
+_peer_keys: dict[str, tuple[ec.EllipticCurvePublicKey, set[int], set[int]]] = {}
+
+with open('/dev/urandom', 'rb') as f:
+    _random = random.Random(f.read(64))
 
 
 @inject
@@ -33,25 +37,31 @@ def init(run_context):
         if not key_file.name.endswith(".pem"):
             continue
         with open(key_file, "rb") as f:
-            _peer_keys[key_file.name] = serialization.load_pem_public_key(f.read()), 0, 0
+            _peer_keys[key_file.name] = serialization.load_pem_public_key(f.read()), set(), set()
 
 
-async def validate_peer_signature(request: Request, x_signature: Annotated[str | None, Header()] = None):
+async def validate_peer_signature(request: Request, x_signature: Annotated[str | None, Header()] = None, x_ticket: Annotated[str | None, Header()] = None):
     if len(_peer_keys) == 0:
         return
     if x_signature is None:
         raise HTTPException(status_code=403, detail="Invalid signature")
+    if x_ticket is None:
+        raise HTTPException(status_code=403, detail="Invalid ticket")
 
     verified = False
-    for key_name, (key, verified_count, signed_count) in _peer_keys.items():
-        result = await digest_request(request, verified_count)
+    ticket = int(x_ticket)
+    for key_name, (key, verified_set, signed_set) in _peer_keys.items():
+        if ticket in verified_set:
+            continue
+        result = await digest_request(request, ticket)
         try:
             key.verify(base64.b64decode(x_signature), result, ECDSA(Prehashed(SHA256())))
         except InvalidSignature:
             continue
         request.state.source = key_name
         verified = True
-        _peer_keys[key_name] = key, verified_count + 1, signed_count
+        verified_set.add(ticket)
+        _peer_keys[key_name] = key, verified_set, signed_set
         break
 
     if not verified:
@@ -71,11 +81,17 @@ async def _sign_response(request: Request, response: Response):
     if not hasattr(request.state, 'source') or not request.state.source:
         return
 
-    key, verified_count, signed_count = _peer_keys[request.state.source]
+    key, verified_set, signed_set = _peer_keys[request.state.source]
 
-    result = await digest_response(response, signed_count)
+    ticket = _random.getrandbits(64)
+    while ticket in signed_set:
+        ticket = _random.getrandbits(64)
+
+    result = await digest_response(response, ticket)
     response.headers['X-Signature'] = str(base64.b64encode(_private_key.sign(result, ECDSA(Prehashed(SHA256())))))
-    _peer_keys[request.state.source] = key, signed_count + 1, signed_count
+    response.headers['X-Ticket'] = str(ticket)
+    signed_set.add(ticket)
+    _peer_keys[request.state.source] = key, verified_set, signed_set
 
 
 def put_sign_response_middleware(app):
