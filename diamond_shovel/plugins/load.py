@@ -82,7 +82,7 @@ class PluginInitContext:
                     config.add_section(section)
                 for key, value in values.items():
                     logging.debug(f"Overriding {section}.{key} with {value}")
-                    config.set(section, key, value)
+                    config.set(section, key, str(value))
 
         return config
 
