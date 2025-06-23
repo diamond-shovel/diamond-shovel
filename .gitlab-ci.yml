@@ -56,8 +56,6 @@ release-to-pypi:
     - twine upload dist/*
   tags:
     - docker
-  rules:
-    - if: $CI_COMMIT_TAG != null
 
 trigger:
   stage: trigger
