@@ -60,6 +60,7 @@ dependencies = [
 
 [tool.setuptools_scm]
 version_file = "diamond_shovel/version.py"
+local_scheme = "no-local-version"
 
 [project.urls]
 Homepage = "https://www.hscsec.cn"
