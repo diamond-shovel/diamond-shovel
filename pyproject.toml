@@ -23,7 +23,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Framework :: FastAPI",
     "Framework :: AsyncIO",
-    "Natural Language :: Simplified Chinese",
 ]
 keywords = [
     "cybersecurity",
