@@ -47,13 +47,17 @@ release-to-pypi:
   stage: release
   image: gitlab.cyberspike.top:5050/docker/python:3.13.3
   script:
-    - sed -i 's|http://deb.debian.org/debian|http://mirrors.huaweicloud.com/debian|g; s|http://deb.debian.org/debian-security|http://mirrors.huaweicloud.com/debian-security|g' /etc/apt/sources.list.d/debian.sources && apt-get update && apt-get install -y patchelf
-    - pip config set global.index-url https://mirrors.huaweicloud.com/repository/pypi/simple
-    - pip install build
-    - python -m build --wheel
-    - pip install twine
-    - TWINE_PASSWORD=${CI_JOB_TOKEN} TWINE_USERNAME=gitlab-ci-token python -m twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi dist/*
-    - twine upload dist/*
+    - export PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+    - pip install --upgrade 'setuptools-scm[toml]' setuptools build twine -i https://mirrors.aliyun.com/pypi/simple/
+    - rm -rf build/ dist/ *.egg-info/
+    - python -m build --sdist --wheel .
+    - twine upload
+      --username __token__
+      --password "$PYPI_API_TOKEN"
+      --repository-url https://upload.pypi.org/legacy/
+      --verbose
+      dist/*
+
   tags:
     - docker
 
