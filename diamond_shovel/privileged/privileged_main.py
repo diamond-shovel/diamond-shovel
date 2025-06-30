@@ -45,8 +45,8 @@ def ensure_privileged():
     """
     Makes sure privileged daemon is enabled
     """
-    if not privileged_queue or not parent_pipe:
-        raise RuntimeError("Privileged queue not set")
+    if not privileged_queue or not parent_pipe or not key:
+        raise RuntimeError("It seems that there is some privileged operation to be done, please run diamond shovel under root user.")
 
 def request_execution(python_bytecode: bytes, function_name: str):
     """
@@ -90,7 +90,7 @@ def terminate():
     """
     Terminate the root daemon
     """
-    if not privileged_queue:
+    if not privileged_queue or not parent_pipe or not key:
         return
     hash_key = hashlib.sha256(dill.dumps(("terminate", key))).digest()
     privileged_queue.put(("terminate", hash_key))
