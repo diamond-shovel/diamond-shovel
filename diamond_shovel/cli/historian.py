@@ -85,9 +85,9 @@ def archive_legacy(directory):
         log_file = pathlib.Path(directory).joinpath(f'{today.strftime("%Y-%m-%d")}-{i}.log')
         compressed_log_file = log_file.with_suffix('.log.tar.gz')
         i += 1
-        if not log_file.exists(follow_symlinks=True) and not compressed_log_file.exists(follow_symlinks=True):
+        if not log_file.exists() and not compressed_log_file.exists():
             return i
-        if not compressed_log_file.exists(follow_symlinks=True):
+        if not compressed_log_file.exists():
             with tarfile.open(compressed_log_file, 'w:gz') as f:
                 f.add(log_file)
             log_file.unlink(missing_ok=True)

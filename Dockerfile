@@ -23,11 +23,12 @@ RUN apt update && \
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 RUN echo "Asia/Shanghai" > /etc/timezone
 
-# 设置工作目录
 WORKDIR /data
 COPY . /data
 
+# make pip most recent as its internal changes, so we can make minimum changes between python versions.
 RUN pip config set global.index-url https://mirrors.huaweicloud.com/repository/pypi/simple && \
+    pip3 install --upgrade pip && \
     pip3 install build setuptools setuptools-scm --break-system-packages && \
     python3 -m build -wn && \
     pip3 install ./dist/*.whl --break-system-packages
