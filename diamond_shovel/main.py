@@ -41,6 +41,9 @@ def main():
         install.perform_removal()
         sys.exit(0)
 
+    if os.geteuid() != 0:
+        configure_rootless_daemon(args)
+
     di[BinaryManager] = BinaryManager()
     diamond_shovel.config.init(args.daemon, args.daemon_config, args.daemon_workdir)
 
@@ -67,6 +70,14 @@ def main():
         run_server(args)
     else:
         run_once(args, blacklist, whitelist)
+
+
+def configure_rootless_daemon(args):
+    args.daemon_config = pathlib.Path.home() / ".config" / "diamond-shovel" if args.daemon_config == pathlib.Path(
+        "/etc/diamond-shovel") else args.daemon_config
+    args.daemon_workdir = pathlib.Path.home() / ".diamond-shovel" if args.daemon_workdir == pathlib.Path(
+        "/var/lib/diamond-shovel") else args.daemon_workdir
+    args.daemon_url = f"unix://{pathlib.Path.home()}/.cache/diamond-shovel/diamond_shovel.sock" if args.daemon_url == "unix:///var/run/diamond_shovel.sock" else args.daemon_url
 
 
 def init_parser_arguments(parser):
@@ -170,9 +181,6 @@ def start_root_daemon():
 
 
 def install_plugin(args):
-    if not os.getuid() == 0:
-        logging.error("请以root权限运行")
-
     plugin_file = args.plugin
     plugin_dir = di["data_path"] / "plugins"
     if not plugin_dir.exists():
