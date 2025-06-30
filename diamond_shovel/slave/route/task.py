@@ -113,7 +113,7 @@ def start_task(scan_id: uuid.UUID):
             scan_session[scan_id]['ctx']._log_hooks.append(log_hook)
             await workers.run_worker(scan_session[scan_id]["ctx"])
             scan_session[scan_id]["state"] = "finished"
-            scan_session[scan_id]['log_lines'].shutdown(immediate=True)
+            scan_session[scan_id]['log_lines'].put_nowait({'shutdown': True})
         except:
             logging.error(f"Error while processing task {scan_id}: {traceback.format_exc()}")
 
@@ -129,11 +129,11 @@ async def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
     await websocket.accept()
 
     while scan_session[scan_id]["state"] == "running":
-        try:
-            log_data = await scan_session[scan_id]["log_lines"].get()
-            await websocket.send_json({'action': 'log', 'body': log_data['log'], 'coroutines': log_data['coroutines']})
-        except asyncio.queues.QueueShutDown:
-            pass
+        log_data = await scan_session[scan_id]["log_lines"].get()
+        if log_data.get("shutdown", False):
+            log_data.put_nowait(log_data)
+            continue
+        await websocket.send_json({'action': 'log', 'body': log_data['log'], 'coroutines': log_data['coroutines']})
 
     await websocket.send_json({'action': 'finished'})
     await asyncio.sleep(1) # allow client to react to our message before connection close
@@ -151,4 +151,4 @@ def stop_task(scan_id: uuid.UUID):
 
     scan_session[scan_id]["state"] = "finished"
     scan_session[scan_id]['loop'].stop()
-    scan_session[scan_id]['log_lines'].shutdown(immediate=True)
+    scan_session[scan_id]['log_lines'].put_nowait({'shutdown': True})
