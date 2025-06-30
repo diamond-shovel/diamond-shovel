@@ -23,7 +23,7 @@ def main():
     diamond_shovel.utils.func.init()
 
     parser = argparse.ArgumentParser(prog=sys.argv[0],
-                                     description="资产扫描及漏洞发现工具")
+                                     description="面向目标的自动化漏洞发现和渗透测试框架")
 
     init_parser_arguments(parser)
 
