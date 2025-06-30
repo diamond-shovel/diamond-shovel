@@ -54,8 +54,7 @@ dependencies = [
     "uvicorn==0.34.0",
     "websockets==15.0.1",
     "python-multipart~=0.0.20",
-    "cryptography==45.0.4",
-    "uvicorn==0.34.0"
+    "cryptography==45.0.4"
 ]
 
 [tool.setuptools_scm]
