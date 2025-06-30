@@ -102,6 +102,10 @@ def init_parser_arguments(parser):
 
 
 def run_server(args):
+    if not args.daemon_workdir.exists():
+        logging.info("你需要先运行diamond-shovel -I执行初始安装")
+        return
+
     di["run_context"] = {
         "root": args.daemon_workdir,
         "daemon": True
