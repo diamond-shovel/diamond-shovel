@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from diamond_shovel.function.task import TaskContext
 from diamond_shovel.function.task import worker_pool as workers
-from diamond_shovel.utils.func import async_helper
+from diamond_shovel.utils.func import async_helper, json_util
 
 router = APIRouter(prefix="/task", tags=["task"])
 
@@ -47,7 +47,10 @@ async def get_task(scan_id: uuid.UUID):
 
     return {
         "state": scan_session[scan_id]["state"],
-        "result": await scan_session[scan_id]["ctx"].get_all_results(),
+        "result": json_util.ChainedJsonEncoder([
+            json_util.EncodableObjectEncoder(),
+            json_util.ExceptionEncoder()
+        ]).default(await scan_session[scan_id]["ctx"].get_all_results()),
         "log": scan_session[scan_id]["ctx"].get_log()
     }
 

@@ -32,7 +32,7 @@ def print_from_process_stream(process: subprocess.Popen, log_prefix, output_cont
                     logging.info(f"{log_prefix}: {line.strip()}")
                     output_container[key].append(line)
                 except UnicodeDecodeError:
-                    logging.warning(f"{log_prefix}: Decode fail: {traceback.format_exc()}")
+                    logging.warning(f"{log_prefix}: 输出解码错误: {traceback.format_exc()}")
                 except ValueError:
                     # Stream has been closed
                     break
@@ -143,13 +143,11 @@ class BinaryManager:
         if not isinstance(out, pathlib.Path):
             out = pathlib.Path(out)
 
-        # 如果这个name已经注册过了，就不再注册
         if self.check_binary(name):
-            logging.debug(f"Binary {name} 已经注册过了")
+            logging.debug(f"二进制程序 {name} 已经注册过了")
             return
         self.binary_path_list[name] = {'path': path, 'out': out}
 
-        # 自动给这个文件添加权限
         self.init_binary_permission_with_name(name)
         self.save_binary_info()
 
@@ -188,7 +186,7 @@ class BinaryManager:
                 logging.debug(f"权限设置成功: {binary['path']}")
             except Exception:
                 traceback.print_exc()
-                logging.error(f"Failed to set permissions for {name} at {binary['path']}")
+                logging.error(f"无法设置在{binary['path']} 的 {name} 的权限")
 
     def init_binary_permission_with_name(self, name):
         """

@@ -163,10 +163,18 @@ def run_once(args, blacklist, whitelist):
     with open(args.out_json, "w") as f:
         scan_result = asyncio.run(task.run_full_scan(ctx))
         try:
-            f.write(json.dumps(scan_result, indent=4, cls=json_util.ExceptionExtendedEncoder))
+            f.write(json_util.ChainedJsonEncoder(
+                [
+                    json_util.EncodableObjectEncoder(),
+                    json_util.ExceptionEncoder()
+                ], ident=4).encode(scan_result))
         except Exception as e:
             scan_result['deserialization_failure'] = e
-            f.write(json.dumps(scan_result, indent=4, cls=json_util.ExceptionExtendedEncoder, skipkeys=True))
+            f.write(json_util.ChainedJsonEncoder(
+                [
+                    json_util.EncodableObjectEncoder(),
+                    json_util.ExceptionEncoder()
+                ], indent=4, skipkeys=True).encode(scan_result))
     out_json_abs_path = os.path.abspath(args.out_json)
     logging.info(f"Output json file path: {out_json_abs_path}")
 
