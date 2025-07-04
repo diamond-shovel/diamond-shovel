@@ -4,16 +4,17 @@ import inspect
 import logging
 import random
 import traceback
-from asyncio import Future, current_task
-from typing import Callable, Any, Coroutine
+import uuid
+from asyncio import Future
+from typing import Callable, Any, Coroutine, Type, AsyncGenerator
 
 import diamond_shovel.plugins.load
 import diamond_shovel.plugins.manage
 from . import scheduler
+from .items import Asset, Loot, Company, Domain, Host, decode_asset, decode_loot
 from .scheduler import CoroutineQueue, ShovelCoroutine
 from ..plugins import events, PluginInitContext, manage
 from ..utils.func import async_helper
-from ..utils.func.async_helper import call_async
 
 
 class WorkerException(Exception):
@@ -46,109 +47,20 @@ class TaskContext:
         self._plugin_config = {}
         self._worker_filters = []
         self._log_hooks = []
-        self._futures: dict[str, Future[Any]] = {}
         self._finished_plugins: dict[str, Future[Any]] = {}
         self._log = []
+        self._nodes: list[Asset] = []
+        self._edges: dict[tuple[Asset, Asset], float] = {}
+        self._loots: list[Loot] = []
 
-    def start(self, workers):
+    def init_workers(self, workers):
         """
         Bootstraps task context with workers
         :params workers: workers to bootstrap with
         """
         if self._worker_tasks is not None:
-            raise Exception("Task already started.")
+            raise Exception("Task already inited with workers.")
         self._worker_tasks = workers
-
-    def __list__(self):
-        return self._futures.keys()
-
-    async def get(self, name: str):
-        """
-        Fetches value in a context
-        Fires a `TaskReadTriggerEvent` and the result can be altered.
-        :params name: key name
-        """
-        logging.debug(f'Getting {name} from {self}, future: {self._futures[name] if name in self._futures else None}')
-        if name not in self._futures or self._futures[name].cancelled() or (self._futures[name].done() and await self._futures[name] is None):
-            logging.debug(f"Reset {name} for {current_task(asyncio.get_running_loop())}")
-            loop = asyncio.get_running_loop()
-            self._futures[name] = loop.create_future()
-
-        # Avoid accidentally uncontrolled modification. Their modification must fire an event.
-        if scheduler.current_coroutine().waiting:
-            value = copy.deepcopy(await self._futures[name])
-        else:
-            async with scheduler.current_coroutine().park(f"ctx[{name}]"):
-                value = copy.deepcopy(await self._futures[name])
-        evt = events.TaskReadTriggerEvent(self, name, value)
-        await async_helper.call_sync(events.call_event, evt)
-
-        return evt.value
-
-    async def set(self, name: str, result: Any):
-        """
-        Sets value in a context
-        Fires a `TaskWriteTriggerEvent` and the result can be altered
-        :params name: key name
-        :params result: the value to be set
-        """
-        logging.debug(f"Setting {name} from {self}, future: {self._futures[name] if name in self._futures else None}, value: {result}")
-
-        loop = asyncio.get_running_loop()
-
-        old_value = None
-        if name in self._futures and self._futures[name].done():
-            old_value = self._futures[name].result()
-
-        evt = events.TaskWriteTriggerEvent(self, name, result, old_value)
-        await async_helper.call_sync(events.call_event, evt)
-        if name not in self._futures or self._futures[name].done():
-            self._futures[name] = loop.create_future()
-        if evt.value is None:
-            raise ValueError(f"Cannot set {name} to None")
-
-        self._futures[name].set_result(evt.value)
-
-    @async_helper.disallows_direct_async
-    def __getitem__(self, item):
-        return call_async(self.get, item)
-
-    @async_helper.disallows_direct_async
-    def __setitem__(self, key, value):
-        call_async(self.set, key, value)
-
-    def items(self):
-        """
-        Fetches a copy of context values
-        :returns: a list of tuples that formatted with key and value.
-        """
-        return [(key, values) for key, values in self._futures.items() if values.done()]
-
-    def __iter__(self):
-        for key, values in self.items():
-            yield key, values
-
-    def __contains__(self, item):
-        return (item in self._futures and self._futures[item].done() and
-                self._futures[item].result() is not None)
-
-    async def operate(self, key, func, *args, **kwargs):
-        """
-        Perform operations on the value, and set the new result back to context.
-        Events will be fired at following order:
-          - TaskReadTriggerEvent
-          - *callback function*
-          - TaskWriteTriggerEvent
-          - TaskReadTriggerEvent
-        :params key: context key to operate
-        :params func: callback function to map the original value to a new value
-        :params args: positional arguments to callback function
-        :params kwargs: keyword arguments to callback function
-        :returns: transformed context value, usually the return value of `func` parameter
-        """
-        tmp = await self.get(key)
-        await self.set(key, func(tmp, *args, **kwargs))
-        return await self.get(key)
 
     async def get_worker_result(self, plugin_name, worker_name):
         """
@@ -180,7 +92,7 @@ class TaskContext:
         if self._worker_tasks is None:
             return None
 
-        return await self._worker_tasks.run()
+        return {"task_results": await self._worker_tasks.run(), "graph": await self.as_graph(), "loot": self._loots}
 
     async def _get_remaining_workers(self, ignore_self=False):
         """
@@ -194,78 +106,8 @@ class TaskContext:
     def get_worker_queue(self):
         return self._worker_tasks
 
-    async def collect(self, key, size=10):
-        """
-        Collects everything from a list value, and tries to wait for more result
-        Yields results are collected in chunks, which is also a list that contains the result
-        :params key: the key to collect
-        :params size: the size of yielded chunks
-        """
-        results = []
-        selected = []
-        retry_times = 0
-        try:
-            async with scheduler.current_coroutine().park(f"ctx.collect({key})"):
-                logging.debug(f"Checking remaining workers: {await self._get_remaining_workers(ignore_self=True)}")
-                while len(await self._get_remaining_workers(ignore_self=True)) > 0:
-                    logging.debug(f"Collecting {key} for {retry_times} times, {scheduler.current_coroutine()}")
-                    retry_times += 1
-
-                    async with scheduler.current_coroutine().unpark():
-                        await scheduler.current_coroutine().wake_watchdog()
-
-                    if await events.wait_event(events.TaskWriteTriggerEvent,
-                                               lambda evt: evt.key == key and evt.task_context == self, timeout=random.random() * 2 + 2) is None:
-                        continue
-                    await asyncio.sleep(random.random() * 2 + 2)
-                    for item in await self.get(key):
-                        if item not in selected:
-                            selected.append(item)
-                            results.append(item)
-                            if len(results) >= size:
-                                async with scheduler.current_coroutine().unpark():
-                                    yield results
-                                results = []
-                    retry_times = 0
-
-                for item in await self.get(key):
-                    if item not in selected:
-                        selected.append(item)
-                        results.append(item)
-                        if len(results) < size:
-                            continue
-                        async with scheduler.current_coroutine().unpark():
-                            yield results
-                        retry_times = 0
-                        results = []
-
-                for item in await self.get(key):
-                    if item in selected:
-                        continue
-                    selected.append(item)
-                    results.append(item)
-                if len(results) > 0:
-                    async with scheduler.current_coroutine().unpark():
-                        yield results
-                retry_times += 1
-                results = []
-        except asyncio.exceptions.CancelledError:
-            # wait for watchdog uncancels us
-            await asyncio.sleep(0.1)
-            logging.debug(f"Got interrupted. exiting. already discovered {selected}")
-            if len(results) > 0:
-                yield results
-
-            # we need to restore the original value as the `future` used before was cancelled
-            # it is in an unreadable state, causing further issues
-            # `selected` collection is the full version of original value, we just set that back.
-            del self._futures[key]
-            await self.set(key, selected)
-
-        logging.debug(f"Finished collecting {key}")
-
     def __repr__(self):
-        return f"TaskContext(futures={{{self._futures}}}, finished_plugins={{{self._finished_plugins}}}, hash={hash(self)})"
+        return f"TaskContext(finished_plugins={{{self._finished_plugins}}}, hash={hash(self)})"
 
     def get_plugin_config(self, plugin_name):
         """
@@ -298,8 +140,7 @@ class TaskContext:
         """
         return self._log
 
-    def add_worker_filter(self,
-                          predicate: Callable[[PluginInitContext,
+    def add_worker_filter(self, predicate: Callable[[PluginInitContext,
                                                Callable[['TaskContext'], Coroutine[Any, Any, Any]]], bool]) -> None:
         """
         Append a filter to worker, only the worker passes all the filters can be applied to this task context
@@ -314,6 +155,268 @@ class TaskContext:
         :params worker: worker function
         """
         return all([filter0(owner, worker) for filter0 in self._worker_filters])
+
+    async def set_relativity(self, node_1: Asset, node_2: Asset, relativity: float):
+        if node_1 not in self._nodes:
+            raise ValueError(f'Node {node_1} not in the node graph. Please add it first.')
+        if node_2 not in self._nodes:
+            raise ValueError(f'Node {node_2} not in the node graph. Please add it first.')
+        if relativity < 0 or relativity > 1:
+            raise ValueError(f'Relativity {relativity} must be in range [0, 1].')
+        if node_1 == node_2:
+            raise ValueError(f'Cannot set relativity for the same node {node_1}.')
+
+        evt = events.GraphNodeRelationUpdateEvent(self, node_1, node_2, relativity)
+        await async_helper.call_sync(events.call_event, evt)
+        relativity = evt.new_relation
+
+        if (node_2, node_1) in self._edges:
+            self._edges[(node_2, node_1)] = relativity
+            return
+
+        self._edges[(node_1, node_2)] = relativity
+
+    async def add_node(self, node: Asset):
+        """
+        Add an asset node to task context
+        :params node: the asset node to be added
+        """
+        if not isinstance(node, Asset):
+            raise ValueError(f'Node {node} is not an asset.')
+
+        evt = events.GraphNodeAddEvent(self, node)
+        await async_helper.call_sync(events.call_event, evt)
+        self._nodes.append(evt.node)
+
+    @property
+    def nodes(self) -> list[Asset]:
+        """
+        Fetches all the nodes in the task context
+        Use `replace_node` to modify the nodes, as they are immutable
+        """
+        return copy.deepcopy(self._nodes)
+
+    @property
+    def loots(self) -> list[Loot]:
+        """
+        Fetches all the loots in the task context
+        Use `add_loot` or `update_loot` to modify the loots, as they are immutable
+        """
+        return copy.deepcopy(self._loots)
+
+    async def add_loot(self, loot: Loot):
+        """
+        Adds a loot to the task context
+        :params loot: the loot to be added
+        """
+        if not isinstance(loot, Loot):
+            raise ValueError(f'Loot {loot} is not a Loot instance.')
+
+        evt = events.LootDiscoveryEvent(self, loot)
+        await async_helper.call_sync(events.call_event, evt)
+        self._loots.append(evt.loot)
+
+    async def update_loot(self, old: Loot, new: Loot):
+        """
+        Updates a loot in the task context
+        :params old: the old loot to be replaced
+        :params new: the new loot to replace with
+        """
+        if old not in self._loots:
+            raise ValueError(f'Loot {old} not in the loot list. Please add it first.')
+        if new in self._loots:
+            raise ValueError(f'Loot {new} already exists in the loot list.')
+
+        evt = events.LootUpdateEvent(self, old, new)
+        await async_helper.call_sync(events.call_event, evt)
+        new = evt.loot
+        index = self._loots.index(old)
+        self._loots[index] = new
+
+    async def replace_node(self, old: Asset, new: Asset):
+        """
+        Replaces an asset node with another one in the task context
+        :params old: the old asset node to be replaced
+        :params new: the new asset node to replace with
+        """
+        if old not in self._nodes:
+            raise ValueError(f'Node {old} not in the node graph. Please add it first.')
+        if new in self._nodes:
+            raise ValueError(f'Node {new} already exists in the node graph.')
+
+        evt = events.GraphNodeReplaceEvent(self, old, new)
+        await async_helper.call_sync(events.call_event, evt)
+        new = evt.node
+        index = self._nodes.index(old)
+        self._nodes[index] = new
+
+        new_edges = {}
+        for (node1, node2), rel in self._edges.items():
+            if node1 == old:
+                new_edges[(new, node2)] = rel
+            elif node2 == old:
+                new_edges[(node1, new)] = rel
+            else:
+                new_edges[(node1, node2)] = rel
+        self._edges = new_edges
+
+    def get_relationship(self, node_1: Asset, node_2: Asset) -> float:
+        """
+        Gets the relationship between two nodes in the task context
+        :params node_1: the first node
+        :params node_2: the second node
+        :returns: the relationship between two nodes
+        """
+        if node_1 not in self._nodes:
+            raise ValueError(f'Node {node_1} not in the node graph. Please add it first.')
+        if node_2 not in self._nodes:
+            raise ValueError(f'Node {node_2} not in the node graph. Please add it first.')
+
+        # do a simple dijkstra algorithm to find max relationship
+        dist = {}
+        for node in self._nodes:
+            dist[node] = float('-inf')
+        dist[node_1] = 1
+        visited = set()
+        queue = [node_1]
+        while queue:
+            current_node = queue.pop(0)
+            if current_node in visited:
+                continue
+            visited.add(current_node)
+
+            for neighbor, rel in self.get_connections(current_node).items():
+                if neighbor not in visited:
+                    new_dist = dist[current_node] * rel
+                    if new_dist > dist[neighbor]:
+                        dist[neighbor] = new_dist
+                        queue.append(neighbor)
+
+        return dist[node_2] if dist[node_2] != float('-inf') else 0.0
+
+    def get_connections(self, node: Asset) -> dict[Asset, float]:
+        """
+        Gets all the connections of a node in the task context
+        :params node: the node to get connections for
+        :returns: a dictionary of node and its relationship
+        """
+        return {
+            **{node1: rel for (node1, node2), rel in self._edges.items() if node2 == node},
+            **{node2: rel for (node1, node2), rel in self._edges.items() if node1 == node}
+        }
+
+    async def collect_nodes(self, predicate: Type | Callable[[Asset], bool] = None, size=10) \
+            -> AsyncGenerator[list[Asset], Any]:
+        """
+        Collects all the nodes in the task context that matches the predicate
+        Things are immutable, you may need to use `replace_node` to modify the nodes
+        :params predicate: a callable that takes an Asset and returns a boolean, or a type to match
+        :returns: a list of Asset that matches the predicate
+        """
+        async for item in  self._do_collect(lambda: self._nodes, events.GraphNodeEvent, predicate, size):
+            yield item
+
+    async def collect_loots(self, predicate: Type | Callable[[Loot], bool] = None, size=10) \
+            -> AsyncGenerator[list[Loot], Any]:
+        """
+        Collects all the loots in the task context that matches the predicate
+        Things are immutable, you may need to use `add_loot` to modify the loots
+        :params predicate: a callable that takes a Loot and returns a boolean, or a type to match
+        :returns: a list of Loot that matches the predicate
+        """
+        async for item in self._do_collect(lambda: self._loots, events.LootEvent, predicate, size):
+            yield item
+
+    async def _do_collect(self, list_fetch: Callable[[], list], event_type: Type[events.TaskEvent], predicate: Type | Callable[[Any], bool] = None, size=10) \
+            -> AsyncGenerator[list[Any], Any]:
+        """
+        Collects everything yielded from `list_fetch` that matches the predicate
+        :params list_fetch: a callable that returns a list of target to collect from
+        :params event_type: the type of event to wait for, usually events.GraphNodeAddEvent or events.LootDiscoveryEvent
+        :params predicate: a callable that takes an Asset and returns a boolean, or a type to match
+        :params size: the size of each batch to yield
+        :returns: a list of Asset that matches the predicate
+        """
+        results = []
+        selected = []
+
+        if predicate is None:
+            predicate = lambda target: True
+        if not isinstance(predicate, Callable):
+            predicate = lambda target: isinstance(target, predicate)
+
+        try:
+            async with scheduler.current_coroutine().park(f"ctx.collect(node -> {predicate})"):
+                logging.debug(f"Checking remaining workers: {await self._get_remaining_workers(ignore_self=True)}")
+                while len(await self._get_remaining_workers(ignore_self=True)) > 0:
+                    logging.debug(f"Collecting nodes with predicate {predicate}, {scheduler.current_coroutine()}")
+
+                    async with scheduler.current_coroutine().unpark():
+                        await scheduler.current_coroutine().wake_watchdog()
+
+                    if await events.wait_event(event_type,
+                                               lambda evt: evt.task_context == self,
+                                               timeout=random.random() * 2 + 2) is None:
+                        continue
+
+                    # await for the put, and/or yield chances for other execution
+                    await asyncio.sleep(random.random() * 2 + 2)
+
+                    for item in list_fetch():
+                        if item not in selected and predicate(item):
+                            selected.append(item)
+                            results.append(copy.deepcopy(item))
+                            if len(results) >= size:
+                                async with scheduler.current_coroutine().unpark():
+                                    yield results
+                                results = []
+
+                for item in list_fetch():
+                    if item not in selected and predicate(item):
+                        selected.append(item)
+                        results.append(copy.deepcopy(item))
+                        if len(results) < size:
+                            continue
+                        async with scheduler.current_coroutine().unpark():
+                            yield results
+                        results = []
+
+                # final reminders
+                for item in list_fetch():
+                    if item in selected or not predicate(item):
+                        continue
+                    selected.append(item)
+                    results.append(copy.deepcopy(item))
+                if len(results) > 0:
+                    async with scheduler.current_coroutine().unpark():
+                        yield results
+                results = []
+        except asyncio.exceptions.CancelledError:
+            # wait for watchdog uncancels us
+            await asyncio.sleep(0.1)
+            logging.debug(f"Got interrupted. exiting. already discovered {selected}")
+            if len(results) > 0:
+                yield results
+
+        logging.debug(f"Finished collecting nodes with predicate {predicate}")
+
+    async def as_graph(self):
+        return {
+            'nodes': {str(node.id): node for node in self._nodes},
+            'edges': [{'nodes': [str(node1.id), str(node2.id)], 'relativity': rel} for (node1, node2), rel in self._edges.items()],
+            'loots': {str(loot.id): loot for loot in self._loots},
+        }
+
+    def from_json(self, data):
+        """
+        Initializes the task context from a JSON data
+        :params data: the JSON data to initialize from
+        """
+        self._nodes = [decode_asset(node) for node in data['graph']['nodes']]
+        self._edges = {(uuid.UUID(edge['nodes'][0]), uuid.UUID(edge['nodes'][1])): edge['relativity'] for edge in data['graph']['edges']}
+        self._loots = [decode_loot(loot) for loot in data['loots']]
+        self._finished_plugins.update({worker_name: asyncio.Future() for worker_name in data['task_results']})
+        [self._finished_plugins[worker_name].set_result(result) for worker_name, result in data['task_results'].items()]
 
 
 class WorkerPool:
@@ -376,7 +479,7 @@ class WorkerPool:
                     logging.info(f"Dispatched worker {worker.__qualname__} for {plugin_ctx.plugin_name}")
                     task = ShovelCoroutine(plugin_ctx, worker, ctx, nice)
                     all_tasks.put(task)
-            ctx.start(all_tasks)
+            ctx.init_workers(all_tasks)
 
             if all_tasks.size() == 0:
                 logging.warning("No workers available.")
@@ -406,9 +509,9 @@ async def initialize_task_context(target_companies=None, target_domains=None, ta
         target_domains = []
 
     ctx = TaskContext()
-    ctx["target_companies"] = target_companies
-    ctx["target_domains"] = target_domains
-    ctx["target_ips"] = target_ips
+    [ctx.add_node(Company(name_or_metadata=company)) for company in target_companies if isinstance(company, str)]
+    [ctx.add_node(Domain(domain_or_metadata=domain)) for domain in target_domains if isinstance(domain, str)]
+    [ctx.add_node(Host(hostname_or_metadata=ip)) for ip in target_ips if isinstance(ip, str)]
     return ctx
 
 

@@ -7,7 +7,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Body, WebSocket, HTTPException
 from pydantic import BaseModel
 
-from diamond_shovel.function.task import TaskContext
+from diamond_shovel.function.task import initialize_task_context
 from diamond_shovel.function.task import worker_pool as workers
 from diamond_shovel.utils.func import async_helper, json_util
 
@@ -24,19 +24,13 @@ class TargetRequest(BaseModel):
 @router.put('/')
 def new_task(target: Annotated[TargetRequest, Body(embed=True)]):
     scan_id = uuid.uuid4()
-    ctx = TaskContext()
+    ctx = initialize_task_context(target.companies, target.domains, target.ips)
 
     scan_session[scan_id] = {
         "ctx": ctx,
         "state": "created",
         "log_lines": asyncio.Queue(),
     }
-
-    ctx['scan_id'] = scan_id
-
-    ctx['target_companies'] = target.companies or []
-    ctx['target_domains'] = target.domains or []
-    ctx['target_ips'] = target.ips or []
 
     return {"scan_id": scan_id}
 
@@ -67,8 +61,7 @@ def update_task_args(params: dict, scan_id: uuid.UUID):
     if scan_id not in scan_session:
         raise HTTPException(404, "Scan session not found")
 
-    for key, value in params.items():
-        scan_session[scan_id]["ctx"][key] = value
+    scan_session[scan_id]['ctx'].from_json(params)
 
 @router.post('/{scan_id}/blacklist')
 def block_task_plugins(plugins: list[str], scan_id: uuid.UUID):

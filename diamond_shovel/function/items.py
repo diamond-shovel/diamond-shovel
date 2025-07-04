@@ -1,92 +1,128 @@
 import abc
-from typing import Any
+import uuid
+from typing import Any, Type
+
+_asset_type_registry: dict[str, Type['Asset']] = {}
+_loot_type_registry: dict[str, Type['Loot']] = {}
 
 
-class ResultGraph:
-    _nodes = []
-    _edges = {}
+def register_asset_type(asset_type: Type['Asset']):
+    """
+    Register a new asset type.
+    :param asset_type: The class of the asset type to register.
+    """
+    if not issubclass(asset_type, Asset):
+        raise TypeError("asset_type must be a subclass of Asset")
+    _asset_type_registry[asset_type.__name__] = asset_type
 
-    def set_relativity(self, node_1: 'Asset', node_2: 'Asset', relativity: float):
-        if node_1 not in self._nodes:
-            raise ValueError(f'Node {node_1} not in the node graph. Please add it first.')
-        if node_2 not in self._nodes:
-            raise ValueError(f'Node {node_2} not in the node graph. Please add it first.')
 
-        if (node_2, node_1) in self._edges:
-            self._edges[(node_2, node_1)] = relativity
-            return
+def register_loot_type(loot_type: Type['Loot']):
+    """
+    Register a new loot type.
+    :param loot_type: The class of the loot
+    type to register.
+    """
+    if not issubclass(loot_type, Loot):
+        raise TypeError("loot_type must be a subclass of Loot")
+    _loot_type_registry[loot_type.__name__] = loot_type
 
-        self._edges[(node_1, node_2)] = relativity
 
-    def add_node(self, node: 'Asset'):
-        self._nodes.append(node)
+def decode_asset(data: dict) -> 'Asset':
+    """
+    Decode a dictionary into an Asset instance.
+    :param data: The dictionary containing asset data.
+    :return: An instance of the corresponding Asset subclass.
+    """
+    asset_type_name = data.get('__type__')
+    if asset_type_name not in _asset_type_registry:
+        raise ValueError(f"Unknown asset type: {asset_type_name}")
 
-    @property
-    def nodes(self) -> list['Asset']:
-        return self._nodes
+    asset_class = _asset_type_registry[asset_type_name]
+    return asset_class(data['metadata'])
 
-    def replace_node(self, old: 'Asset', new: 'Asset'):
-        if old not in self._nodes:
-            raise ValueError(f'Node {old} not in the node graph. Please add it first.')
-        if new in self._nodes:
-            raise ValueError(f'Node {new} already exists in the node graph.')
 
-        index = self._nodes.index(old)
-        self._nodes[index] = new
+def decode_loot(data: dict) -> 'Loot':
+    """
+    Decode a dictionary into a Loot instance.
+    :param data: The dictionary containing loot data.
+    :return: An instance of the corresponding Loot subclass.
+    """
+    loot_type_name = data.get('__type__')
+    if loot_type_name not in _loot_type_registry:
+        raise ValueError(f"Unknown loot type: {loot_type_name}")
 
-        new_edges = {}
-        for (node1, node2), rel in self._edges.items():
-            if node1 == old:
-                new_edges[(new, node2)] = rel
-            elif node2 == old:
-                new_edges[(node1, new)] = rel
-            else:
-                new_edges[(node1, node2)] = rel
-        self._edges = new_edges
-
-    def get_relationship(self, node_1: 'Asset', node_2: 'Asset') -> float:
-        if node_1 not in self._nodes:
-            raise ValueError(f'Node {node_1} not in the node graph. Please add it first.')
-        if node_2 not in self._nodes:
-            raise ValueError(f'Node {node_2} not in the node graph. Please add it first.')
-
-        # do a simple dijkstra algorithm to find max relationship
-        dist = {}
-        for node in self._nodes:
-            dist[node] = float('-inf')
-        dist[node_1] = 1
-        visited = set()
-        queue = [node_1]
-        while queue:
-            current_node = queue.pop(0)
-            if current_node in visited:
-                continue
-            visited.add(current_node)
-
-            for neighbor, rel in self.get_connections(current_node).items():
-                if neighbor not in visited:
-                    new_dist = dist[current_node] * rel
-                    if new_dist > dist[neighbor]:
-                        dist[neighbor] = new_dist
-                        queue.append(neighbor)
-
-        return dist[node_2] if dist[node_2] != float('-inf') else 0.0
-
-    def get_connections(self, node: 'Asset') -> dict['Asset', float]:
-        return {
-            **{node1: rel for (node1, node2), rel in self._edges.items() if node2 == node},
-            **{node2: rel for (node1, node2), rel in self._edges.items() if node1 == node}
-        }
+    loot_class = _loot_type_registry[loot_type_name]
+    return loot_class(uuid.UUID(data['discovered_asset']), data.get('metadata', {}))
 
 
 class Asset(abc.ABC):
-    host: 'Host'
+    id = uuid.uuid4()
+    metadata: dict[str, Any]
+
+    def __init__(self, metadata: dict[str, Any] | None = None):
+        """
+        Initialize the Asset with optional metadata.
+        :param metadata: A dictionary containing asset metadata.
+        """
+        if metadata is None:
+            metadata = {}
+        self.metadata = metadata
+
     @abc.abstractmethod
     def __hash__(self):
         ...
-    @abc.abstractmethod
+
     def jsonify(self):
+        return {'__type__': type(self).__name__, 'metadata': self.jsonify_metadata()}
+
+    @abc.abstractmethod
+    def jsonify_metadata(self):
+        """
+        Return a dictionary representation of the asset's metadata.
+        This method should be implemented by subclasses to provide
+        specific metadata details.
+        """
         ...
+
+
+class Company(Asset):
+    name: str
+
+    def __init__(self, name_or_metadata: str | dict[str, Any], metadata: dict[str, Any] = None):
+        if isinstance(name_or_metadata, dict):
+            self.name = name_or_metadata.pop('name')
+            super().__init__(name_or_metadata)
+
+        self.name = name_or_metadata
+        if metadata is None:
+            metadata = {}
+        super().__init__(metadata)
+
+    def __hash__(self):
+        return hash((type(self), self.name))
+
+    def jsonify_metadata(self):
+        return {'name': self.name, **self.metadata}
+
+
+class Domain(Asset):
+    domain: str
+
+    def __init__(self, domain_or_metadata: str | dict[str, Any], metadata: dict[str, Any] = None):
+        if isinstance(domain_or_metadata, dict):
+            self.domain = domain_or_metadata.pop('domain')
+            super().__init__(domain_or_metadata)
+
+        self.domain = domain_or_metadata
+        if metadata is None:
+            metadata = {}
+        super().__init__(metadata)
+
+    def __hash__(self):
+        return hash((type(self), self.domain))
+
+    def jsonify_metadata(self):
+        return {'domain': self.domain, **self.metadata}
 
 
 class Host(Asset):
@@ -94,54 +130,120 @@ class Host(Asset):
 
     hostname: str
 
+    def __init__(self, hostname_or_metadata: str | dict[str, Any], metadata: dict[str, Any] = None):
+        if isinstance(hostname_or_metadata, dict):
+            self.hostname = hostname_or_metadata.pop('hostname')
+            super().__init__(hostname_or_metadata)
+
+        self.hostname = hostname_or_metadata
+        if metadata is None:
+            metadata = {}
+        super().__init__(metadata)
+
     def __hash__(self):
         return hash((type(self), self.hostname))
 
-    def jsonify(self):
-        return {'type': 'host', 'metadata': {'hostname': self.hostname}}
+    def jsonify_metadata(self):
+        return {'hostname': self.hostname, **self.metadata}
 
 
 class Service(Asset):
+    host: uuid.UUID
     port: int
     protocol: str
     service_name: str
-    version_str: str
     metadata: dict[str, Any]
 
-    def __hash__(self):
-        return hash((type(self), self.host, self.port, self.protocol, self.service_name, self.version_str))
+    def __init__(self, metadata: dict[str, Any] | None = None):
+        if metadata is None:
+            super().__init__(metadata)
+            return
 
-    def jsonify(self):
+        self.host = metadata.pop('host')
+        self.port = metadata.pop('port')
+        self.protocol = metadata.pop('protocol')
+        self.service_name = metadata.pop('service_name')
+        super().__init__(metadata)
+
+    def __hash__(self):
+        return hash((type(self), self.host, self.port, self.protocol, self.service_name))
+
+    def jsonify_metadata(self):
         return {
-            'type': 'service',
-            'metadata': {
+                'host': self.host,
                 'port': self.port,
                 'protocol': self.protocol,
                 'service_name': self.service_name,
-                'version_str': self.version_str,
                 **self.metadata
-            }
         }
 
 
-class Vulnerability:
+class Loot(abc.ABC):
+    id = uuid.uuid4()
+    discovered_asset_id: uuid.UUID
+    metadata: dict[str, Any]
+
+    def __init__(self, discovered_asset_id: uuid.UUID, metadata: dict[str, Any] | None = None):
+        """
+        Initialize the Loot with the ID of the discovered asset.
+        :param discovered_asset_id: The UUID of the asset where this loot was discovered.
+        """
+        self.discovered_asset_id = discovered_asset_id
+
+        if metadata is None:
+            metadata = {}
+        self.metadata = metadata
+
+    @abc.abstractmethod
+    def __hash__(self):
+        ...
+
+    def jsonify(self):
+        return {
+            '__type__': type(self).__name__,
+            'discovered_asset': self.discovered_asset_id
+        }
+
+    @abc.abstractmethod
+    def jsonify_metadata(self):
+        """
+        Return a dictionary representation of the loot's metadata.
+        This method should be implemented by subclasses to provide
+        specific metadata details.
+        """
+        ...
+
+
+class Vulnerability(Loot):
     name: str
     description: str
     type: str
     severity: str
-    metadata: dict[str, Any]
+
+    def __init__(self, discovered_asset_id: uuid.UUID, metadata: dict[str, Any] | None = None):
+        """
+        Initialize the Vulnerability with the ID of the discovered asset and metadata.
+        :param discovered_asset_id: The UUID of the asset where this vulnerability was discovered.
+        :param metadata: A dictionary containing vulnerability metadata.
+        """
+        if metadata is None:
+            metadata = {}
+
+        self.name = metadata.pop('name', None)
+        self.description = metadata.pop('description', None)
+        self.type = metadata.pop('type', None)
+        self.severity = metadata.pop('severity', None)
+
+        super().__init__(discovered_asset_id, metadata)
 
     def __hash__(self):
         return hash((type(self), self.name, self.type, self.severity))
 
-    def jsonify(self):
+    def jsonify_metadata(self):
         return {
-            'type': 'vulnerability',
-            'metadata': {
                 'name': self.name,
                 'description': self.description,
                 'type': self.type,
                 'severity': self.severity,
                 **self.metadata
-            }
         }

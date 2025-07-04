@@ -97,6 +97,90 @@ class TaskWriteTriggerEvent(TaskEvent):
         self.old_value = old_value
 
 
+class GraphNodeEvent(TaskEvent):
+    """
+    Graph node event, fired when a graph node is operated
+    nodes are still mutable here, feel free to modify the node
+    """
+    def __init__(self, task_context, node):
+        """
+        :param GraphNode node: the graph node
+        """
+        super().__init__(task_context)
+        self.node = node
+
+
+class GraphNodeAddEvent(GraphNodeEvent):
+    """
+    Graph node add event, fired when a graph node is added
+    nodes are still mutable here, feel free to modify the node
+    """
+    def __init__(self, task_context, node):
+        super().__init__(task_context, node)
+
+
+class GraphNodeReplaceEvent(GraphNodeEvent):
+    """
+    Graph node replace event, fired when a graph node is replaced
+    nodes are still mutable here, feel free to modify the node
+    """
+    def __init__(self, task_context, old_node, new_node):
+        super().__init__(task_context, new_node)
+        self.old_node = old_node
+
+
+class GraphNodeRelationUpdateEvent(GraphNodeEvent):
+    """
+    Graph node relation update event, fired when graph nodes' relation is updated
+    """
+    def __init__(self, task_context, node, another_node, new_relation):
+        super().__init__(task_context, node)
+        self.another_node = another_node
+        self.new_relation = new_relation
+
+
+class LootEvent(TaskEvent):
+    """
+    Loot event, fired when a loot is operated
+    loot are still mutable here, feel free to modify the loot
+    """
+    def __init__(self, task_context, loot):
+        """
+        :param TaskContext task_context: the task context
+        :param Loot loot: the loot
+        """
+        super().__init__(task_context)
+        self.loot = loot
+
+
+class LootDiscoveryEvent(LootEvent):
+    """
+    Loot discovery event, fired when a loot is discovered
+    loot are still mutable here, feel free to modify the loot
+    """
+    def __init__(self, task_context, loot):
+        """
+        :param TaskContext task_context: the task context
+        :param Loot loot: the discovered loot
+        """
+        super().__init__(task_context, loot)
+
+
+class LootUpdateEvent(LootEvent):
+    """
+    Loot update event, fired when a loot is updated
+    loot are still mutable here, feel free to modify the loot
+    """
+    def __init__(self, task_context, old_loot, new_loot):
+        """
+        :param TaskContext task_context: the task context
+        :param Loot old_loot: the old loot
+        :param Loot new_loot: the new loot
+        """
+        super().__init__(task_context, new_loot)
+        self.old_loot = old_loot
+
+
 def register_event(init_ctx, evt_class, handler):
     """
     register an event handler
