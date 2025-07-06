@@ -77,7 +77,6 @@ def configure_rootless_daemon(args):
         "/etc/diamond-shovel") else args.daemon_config
     args.daemon_workdir = pathlib.Path.home() / ".diamond-shovel" if args.daemon_workdir == pathlib.Path(
         "/var/lib/diamond-shovel") else args.daemon_workdir
-    args.daemon_url = f"unix://{pathlib.Path.home()}/.cache/diamond-shovel/diamond_shovel.sock" if args.daemon_url == "unix:///var/run/diamond_shovel.sock" else args.daemon_url
 
 
 def init_parser_arguments(parser):
@@ -94,7 +93,7 @@ def init_parser_arguments(parser):
     parser.add_argument("--disable-plugin", type=str, default=None, help="禁用插件", nargs="*")
 
     parser.add_argument("-D", "--daemon", help="以Daemon模式运行", action="store_true")
-    parser.add_argument("-U", "--daemon-url", help="Daemon将会监听的URL", type=str, default="unix:///var/run/diamond_shovel.sock")
+    parser.add_argument("-U", "--daemon-url", help="Daemon将会监听的URL", type=str, default="http://0.0.0.0:8848")
     parser.add_argument("--daemon-config", help="Daemon将会使用的配置文件路径", type=pathlib.Path, default=pathlib.Path("/etc/diamond-shovel"))
     parser.add_argument("--daemon-workdir", help="Daemon将会使用的工作目录", type=pathlib.Path, default=pathlib.Path("/var/lib/diamond-shovel"))
 

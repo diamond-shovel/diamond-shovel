@@ -36,4 +36,4 @@ RUN pip config set global.index-url https://mirrors.huaweicloud.com/repository/p
 RUN diamond-shovel -I
 
 EXPOSE 8848
-ENTRYPOINT ["diamond-shovel", "-D", "-U", "http://0.0.0.0:8848/"]
+ENTRYPOINT ["diamond-shovel", "-D"]
