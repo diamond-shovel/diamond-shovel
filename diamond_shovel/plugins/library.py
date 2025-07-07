@@ -53,6 +53,8 @@ def initalize_pip_options(options):
     options.progress_bar = "on"
     options.require_hashes = False
     options.ignore_dependencies = False
+    options.dependency_groups = None
+    options.resume_retries = 3
 
 
 class PythonLibDownloader(RequirementCommand):

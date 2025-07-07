@@ -364,26 +364,25 @@ class WorkerPool:
             else await initialize_task_context(ctx_target_companies, target_domains, target_ips)
 
         try:
-            async with asyncio.TaskGroup() as tg:
-                await async_helper.call_sync(events.call_event, events.TaskDispatchEvent(ctx))
-                all_tasks = CoroutineQueue()
-                for plugin_ctx, workers in self._workers.items():
-                    if not manage.is_plugin_enabled(plugin_ctx.plugin_name):
+            await async_helper.call_sync(events.call_event, events.TaskDispatchEvent(ctx))
+            all_tasks = CoroutineQueue()
+            for plugin_ctx, workers in self._workers.items():
+                if not manage.is_plugin_enabled(plugin_ctx.plugin_name):
+                    continue
+                for worker, nice in workers:
+                    if not ctx.filter_worker(plugin_ctx, worker):
                         continue
-                    for worker, nice in workers:
-                        if not ctx.filter_worker(plugin_ctx, worker):
-                            continue
 
-                        logging.info(f"Dispatched worker {worker.__qualname__} for {plugin_ctx.plugin_name}")
-                        task = ShovelCoroutine(plugin_ctx, worker, ctx, tg, nice)
-                        all_tasks.put(task)
-                ctx.start(all_tasks)
+                    logging.info(f"Dispatched worker {worker.__qualname__} for {plugin_ctx.plugin_name}")
+                    task = ShovelCoroutine(plugin_ctx, worker, ctx, nice)
+                    all_tasks.put(task)
+            ctx.start(all_tasks)
 
-                if all_tasks.size() == 0:
-                    logging.warning("No workers available.")
-                    return "No worker to run."
+            if all_tasks.size() == 0:
+                logging.warning("No workers available.")
+                return "No worker to run."
 
-                return await ctx.get_all_results()
+            return await ctx.get_all_results()
         except Exception:
             logging.error(f"Error while running workers for context {ctx}: {traceback.format_exc()}")
             return "Errored"

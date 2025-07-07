@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import json
 import logging
 import multiprocessing
@@ -40,6 +41,9 @@ def main():
         install.perform_removal()
         sys.exit(0)
 
+    if os.geteuid() != 0:
+        configure_rootless_daemon(args)
+
     di[BinaryManager] = BinaryManager()
     diamond_shovel.config.init(args.daemon, args.daemon_config, args.daemon_workdir)
 
@@ -68,6 +72,13 @@ def main():
         run_once(args, blacklist, whitelist)
 
 
+def configure_rootless_daemon(args):
+    args.daemon_config = pathlib.Path.home() / ".config" / "diamond-shovel" if args.daemon_config == pathlib.Path(
+        "/etc/diamond-shovel") else args.daemon_config
+    args.daemon_workdir = pathlib.Path.home() / ".diamond-shovel" if args.daemon_workdir == pathlib.Path(
+        "/var/lib/diamond-shovel") else args.daemon_workdir
+
+
 def init_parser_arguments(parser):
     parser.add_argument("-I", "--install", help="安装必要文件", action="store_true")
     parser.add_argument("-u", "--uninstall", help="卸载", action="store_true")
@@ -82,7 +93,7 @@ def init_parser_arguments(parser):
     parser.add_argument("--disable-plugin", type=str, default=None, help="禁用插件", nargs="*")
 
     parser.add_argument("-D", "--daemon", help="以Daemon模式运行", action="store_true")
-    parser.add_argument("-U", "--daemon-url", help="Daemon将会监听的URL", type=str, default="unix:///var/run/diamond_shovel.sock")
+    parser.add_argument("-U", "--daemon-url", help="Daemon将会监听的URL", type=str, default="http://0.0.0.0:8848")
     parser.add_argument("--daemon-config", help="Daemon将会使用的配置文件路径", type=pathlib.Path, default=pathlib.Path("/etc/diamond-shovel"))
     parser.add_argument("--daemon-workdir", help="Daemon将会使用的工作目录", type=pathlib.Path, default=pathlib.Path("/var/lib/diamond-shovel"))
 
@@ -90,6 +101,10 @@ def init_parser_arguments(parser):
 
 
 def run_server(args):
+    if not args.daemon_workdir.exists():
+        logging.info("你需要先运行diamond-shovel -I执行初始安装")
+        return
+
     di["run_context"] = {
         "root": args.daemon_workdir,
         "daemon": True
@@ -145,7 +160,7 @@ def run_once(args, blacklist, whitelist):
     merge_list(ctx, "target_ips", target_ips)
 
     with open(args.out_json, "w") as f:
-        scan_result = ctx.get_assigned_event_loop().run_until_complete(task.run_full_scan(ctx))
+        scan_result = asyncio.run(task.run_full_scan(ctx))
         try:
             f.write(json.dumps(scan_result, indent=4, cls=json_util.ExceptionExtendedEncoder))
         except Exception as e:
@@ -169,9 +184,6 @@ def start_root_daemon():
 
 
 def install_plugin(args):
-    if not os.getuid() == 0:
-        logging.error("请以root权限运行")
-
     plugin_file = args.plugin
     plugin_dir = di["data_path"] / "plugins"
     if not plugin_dir.exists():

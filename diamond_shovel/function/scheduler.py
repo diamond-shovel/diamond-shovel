@@ -5,7 +5,6 @@ import threading
 import time
 import traceback
 import typing
-from asyncio import TaskGroup
 from contextlib import asynccontextmanager
 from queue import PriorityQueue
 from typing import Callable
@@ -14,8 +13,7 @@ from diamond_shovel.utils.func import async_helper
 
 
 class ShovelCoroutine:
-    def __init__(self, plugin_ctx, coro: Callable[[typing.Any], typing.Coroutine], ctx, task_group: TaskGroup,
-                 nice: int):
+    def __init__(self, plugin_ctx, coro: Callable[[typing.Any], typing.Coroutine], ctx, nice: int):
         self.ctx = ctx
         self._coro = coro
         self._name = (plugin_ctx.plugin_name if plugin_ctx else "unknown") + ":" + '.'.join(str(coro.__module__).split('.')[1:]) + '.' + coro.__qualname__
@@ -24,7 +22,6 @@ class ShovelCoroutine:
         self._result = None
         self._task = None
         self._nice = nice
-        self._task_group = task_group
         self._running_schedulers = []
 
     def __str__(self):
@@ -77,7 +74,7 @@ class ShovelCoroutine:
                     self._running_schedulers.remove(scheduler)
                     logging.error(f"Error running {self._name}: {''.join(traceback.format_exception(e))}")
 
-            self._task = self._task_group.create_task(run(), name=self._name)
+            self._task = asyncio.create_task(run(), name=self._name)
             coroutine_wrapper_mapping[self._task] = self
 
         return self._task
@@ -175,8 +172,7 @@ async def dummy(_):
     pass
 
 
-dummy_coroutine = ShovelCoroutine(None, dummy, None, TaskGroup(), 0)
-dummy_task_group = TaskGroup()
+dummy_coroutine = ShovelCoroutine(None, dummy, None, 0)
 
 
 def current_coroutine(loop=None) -> ShovelCoroutine:
@@ -191,7 +187,6 @@ class CoroutineQueue:
     def __init__(self):
         self._queue: PriorityQueue[tuple[int, ShovelCoroutine]] = PriorityQueue()
         self._name_map: dict[str, ShovelCoroutine] = {}
-        self._task_group = TaskGroup()
         self._watchdog_alarm = threading.Event()
         self._task_to_interrupt = []
 
