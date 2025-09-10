@@ -40,6 +40,13 @@ def new_task(target: Annotated[TargetRequest, Body(embed=True)]):
 
     return {"scan_id": scan_id}
 
+@router.get('/')
+async def peek_all_tasks():
+    result = {}
+    for scan_id, session in scan_session.items():
+        result[scan_id] = session['state']
+    return result
+
 @router.get('/{scan_id}')
 async def get_task(scan_id: uuid.UUID):
     if scan_id not in scan_session:
