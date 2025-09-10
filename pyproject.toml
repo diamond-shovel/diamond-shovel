@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools==80.9.0", "setuptools-scm>=8.2.0"]
+requires = ["setuptools>=65.5.1", "setuptools-scm>=8.2.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,9 +7,8 @@ dynamic = ["version"]
 name = "diamond-shovel"
 description = "A high-performance task-processing framework designed for cybersecurity"
 readme = "README.md"
-requires-python = ">=3.13"
-license = "LGPL-3.0-only"
-license-files = ["LICENSE"]
+requires-python = ">=3.10"
+license = {file = "LICENSE.md"}
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

@@ -6,21 +6,43 @@ import shutil
 from . import config_generation
 
 
-def perform_installation(root: pathlib.Path = pathlib.Path("/")):
-    if os.getuid() != 0:
-        raise PermissionError("请以root权限运行安装程序")
+def get_config_dir(root: pathlib.Path = pathlib.Path("/")):
+    if os.geteuid() == 0:
+        return root / "etc" / "diamond-shovel"
+    return pathlib.Path.home() / ".config" / "diamond-shovel"
 
+
+def get_log_dir(root: pathlib.Path = pathlib.Path("/")):
+    if os.geteuid() == 0:
+        return root / "var" / "log" / "diamond-shovel"
+    return pathlib.Path.home() / ".cache" / "diamond-shovel" / "log"
+
+
+def get_runtime_dir(root: pathlib.Path = pathlib.Path("/")):
+    if os.geteuid() == 0:
+        return root / "var" / "run" / "diamond-shovel"
+    return pathlib.Path.home() / ".cache" / "diamond-shovel" / "run"
+
+
+def get_data_dir(root: pathlib.Path = pathlib.Path("/")):
+    if os.geteuid() == 0:
+        return root / "var" / "lib" / "diamond-shovel"
+    return pathlib.Path.home() / ".diamond-shovel"
+
+
+def perform_installation(root: pathlib.Path = pathlib.Path("/")):
     logging.info("检查依赖...")
     if not os.path.exists("/usr/bin/git"):
         raise FileNotFoundError("请安装git")
 
     logging.info("检查是否重复安装...")
-    if (root / "etc" / "diamond-shovel" / "diamond-shovel.ini").exists():
+    if (get_config_dir(root) / "diamond-shovel.ini").exists():
         logging.error("已经安装过了")
         return
 
-    logging.info("创建用户...")
-    install_user()
+    if os.geteuid() == 0:
+        logging.info("创建用户...")
+        install_user()
 
     logging.info("创建配置文件...")
     install_config(root)
@@ -38,51 +60,52 @@ def perform_installation(root: pathlib.Path = pathlib.Path("/")):
 
 
 def install_log_folder(root):
-    log_folder = root / "var" / "log" / "diamond-shovel"
+    log_folder = get_log_dir(root)
     log_folder.mkdir(parents=True, exist_ok=True)
     log_folder.chmod(0o644)
-    shutil.chown(log_folder, "diamond-shovel", "diamond-shovel")
+    shutil.chown(log_folder, "diamond-shovel", "diamond-shovel") if os.geteuid() == 0 else None
 
 
 def install_runtime_folder(root):
-    run_folder = root / "var" / "run" / "diamond-shovel"
+    run_folder = get_runtime_dir(root)
     run_folder.mkdir(parents=True, exist_ok=True)
     run_folder.chmod(0o644)
-    shutil.chown(run_folder, "diamond-shovel", "diamond-shovel")
+    shutil.chown(run_folder, "diamond-shovel", "diamond-shovel") if os.geteuid() == 0 else None
 
 
 def install_data_folder(root):
-    data_folder = root / "var" / "lib" / "diamond-shovel"
+    data_folder = get_data_dir(root)
     data_folder.mkdir(parents=True, exist_ok=True)
     data_folder.chmod(0o755)
-    shutil.chown(data_folder, "diamond-shovel", "diamond-shovel")
+    shutil.chown(data_folder, "diamond-shovel", "diamond-shovel") if os.geteuid() == 0 else None
 
 
 def install_config(root):
-    config_folder = root / "etc" / "diamond-shovel"
+    config_folder = get_config_dir(root)
     config_folder.mkdir(parents=True, exist_ok=True)
     config_generation.generate_config(config_folder)
 
 
 def perform_removal(root: pathlib.Path = pathlib.Path('/')):
-    if os.getuid() != 0:
-        raise PermissionError("请以root权限运行安装程序")
-
     logging.info("删除数据文件夹...")
-    data_folder = root / "var" / "lib" / "diamond-shovel"
+    data_folder = get_data_dir(root)
     data_folder.rmdir()
 
     logging.info("删除运行文件夹...")
-    run_folder = root / "var" / "run" / "diamond-shovel"
+    run_folder = get_runtime_dir(root)
     run_folder.rmdir()
 
     logging.info("删除日志文件夹...")
-    log_folder = root / "var" / "log" / "diamond-shovel"
+    log_folder = get_log_dir(root)
     log_folder.rmdir()
 
     logging.info("删除配置文件...")
-    config_folder = root / "etc" / "diamond-shovel" / "diamond-shovel.ini"
-    config_folder.unlink()
+    config_folder = get_config_dir(root)
+    config_folder.rmdir()
+
+    if os.geteuid() == 0:
+        logging.info("删除用户...")
+        uninstall_user()
 
     logging.info("卸载完成")
 
