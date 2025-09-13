@@ -150,6 +150,8 @@ async def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
         except WebSocketDisconnect:
             break
 
+    logging.debug(f'WebSocket disconnected for scan_id {scan_id}')
+
 @router.get('/')
 def all_tasks():
     return list(scan_session.keys())
