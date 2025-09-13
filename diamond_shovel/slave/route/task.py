@@ -143,7 +143,7 @@ async def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
         await websocket.send_json({'action': 'log', 'body': log_data['log'], 'coroutines': log_data['coroutines']})
 
     await websocket.send_json({'action': 'finished'})
-    await asyncio.sleep(1) # allow client to react to our message before connection close
+    await asyncio.sleep(60) # allow client to react to our message before connection close
 
     await websocket.close()
 
