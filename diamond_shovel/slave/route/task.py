@@ -143,11 +143,9 @@ async def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
             continue
         await websocket.send_json({'action': 'log', 'body': log_data['log'], 'coroutines': log_data['coroutines']})
 
-    await websocket.send_json({'action': 'finished'})
-
     while True:
         try:
-            _ = await websocket.receive_json()
+            await websocket.send_json({'action': 'finished'})
             await asyncio.sleep(1)
         except WebSocketDisconnect:
             break
