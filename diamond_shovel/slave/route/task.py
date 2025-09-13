@@ -6,6 +6,7 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Body, WebSocket, HTTPException
 from pydantic import BaseModel
+from starlette.websockets import WebSocketDisconnect
 
 from diamond_shovel.function.task import TaskContext
 from diamond_shovel.function.task import worker_pool as workers
@@ -143,9 +144,13 @@ async def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
         await websocket.send_json({'action': 'log', 'body': log_data['log'], 'coroutines': log_data['coroutines']})
 
     await websocket.send_json({'action': 'finished'})
-    await asyncio.sleep(60) # allow client to react to our message before connection close
 
-    await websocket.close()
+    while True:
+        try:
+            _ = await websocket.receive_json()
+            await asyncio.sleep(1)
+        except WebSocketDisconnect:
+            break
 
 @router.get('/')
 def all_tasks():
