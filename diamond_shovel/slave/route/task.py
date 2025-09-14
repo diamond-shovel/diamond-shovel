@@ -139,7 +139,7 @@ async def poll_logs(scan_id: uuid.UUID, websocket: WebSocket):
     while scan_session[scan_id]["state"] == "running":
         log_data = await scan_session[scan_id]["log_lines"].get()
         if log_data.get("shutdown", False):
-            log_data.put_nowait(log_data)
+            scan_session[scan_id]["log_lines"].put_nowait(log_data)
             continue
         await websocket.send_json({'action': 'log', 'body': log_data['log'], 'coroutines': log_data['coroutines']})
 
